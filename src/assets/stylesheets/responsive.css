@@ -70,7 +70,7 @@
 
 @media (max-width: 991.98px) {
   .drag {
-    cursor: default;
+    display: none;
   }
   .c-button-pill,
   .c-search input {

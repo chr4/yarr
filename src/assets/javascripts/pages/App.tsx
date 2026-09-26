@@ -44,6 +44,14 @@ const THEME_COLORS: Record<string, string> = {
 
 const TITLE = document.title;
 
+// room kept for the article view when resizing the feed and item lists
+const MIN_ARTICLE_WIDTH = 300;
+
+function clampColumnWidth(width: number, min: number, otherColumnWidth: number): number {
+  const max = Math.max(min, window.innerWidth - otherColumnWidth - MIN_ARTICLE_WIDTH);
+  return Math.min(Math.max(min, width), max);
+}
+
 export default function App() {
   const { t, setLang } = useI18n();
   const appSettings = window.app?.settings || {};
@@ -126,11 +134,15 @@ export default function App() {
   }, [settings.values.language.value, setLang]);
 
   const resizeFeedList = (w: number) => {
-    settings.update({ feed_list_width: Math.min(Math.max(200, w), 700) });
+    settings.update({
+      feed_list_width: clampColumnWidth(w, 150, settings.values.item_list_width.value),
+    });
   };
 
   const resizeItemList = (w: number) => {
-    settings.update({ item_list_width: Math.min(Math.max(200, w), 700) });
+    settings.update({
+      item_list_width: clampColumnWidth(w, 200, settings.values.feed_list_width.value),
+    });
   };
 
   // Computed signals
@@ -782,7 +794,7 @@ export default function App() {
         id="col-feed-list"
         className="vh-100 position-relative d-flex flex-column border-end flex-shrink-0"
         style={{ width: `${settings.values.feed_list_width.value}px` }}>
-        <Drag width={settings.values.feed_list_width.value} onResize={resizeFeedList} />
+        <Drag onResize={resizeFeedList} onReset={() => resizeFeedList(300)} />
         <div className="px-2 py-1 d-flex justify-content-between gap-2">
           <DropdownApp
             settings={settings}
@@ -910,7 +922,7 @@ export default function App() {
         id="col-item-list"
         className="vh-100 position-relative d-flex flex-column border-end flex-shrink-0"
         style={{ width: `${settings.values.item_list_width.value}px` }}>
-        <Drag width={settings.values.item_list_width.value} onResize={resizeItemList} />
+        <Drag onResize={resizeItemList} onReset={() => resizeItemList(300)} />
         <div className="px-2 py-1 d-flex gap-1 align-items-center">
           <Tooltip label={t("show_feeds")}>
             <button
@@ -1081,7 +1093,7 @@ export default function App() {
           draft={filterDraft.value}
           onChanged={onFiltersChanged}
           onClose={() => (showFilters.value = false)}
-          listHandle={<Drag width={settings.values.item_list_width.value} onResize={resizeItemList} />}
+          listHandle={<Drag onResize={resizeItemList} onReset={() => resizeItemList(300)} />}
         />
       )}
 

@@ -1,31 +1,48 @@
-import { useCallback } from "preact/hooks";
+import { useSignal } from "@preact/signals";
+import { useRef } from "preact/hooks";
 
 interface DragProps {
-  width: number;
   onResize: (width: number) => void;
+  onReset: () => void;
 }
 
-export default function Drag({ width, onResize }: DragProps) {
-  const onMouseDown = useCallback(
-    (e: MouseEvent) => {
-      const startX = e.clientX;
-      const initW = width;
+export default function Drag({ onResize, onReset }: DragProps) {
+  const active = useSignal(false);
+  const startX = useRef(0);
+  const initW = useRef(0);
 
-      const onMouseMove = (ev: MouseEvent) => {
-        const offset = ev.clientX - startX;
-        onResize(initW + offset);
-      };
+  const onPointerDown = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const el = e.currentTarget as HTMLElement;
+    startX.current = e.clientX;
+    // measure the rendered column rather than relying on the stored width
+    initW.current = el.parentElement!.getBoundingClientRect().width;
+    active.value = true;
+    document.body.classList.add("is-resizing");
+    el.setPointerCapture(e.pointerId);
+  };
 
-      const onMouseUp = () => {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-      };
+  const onPointerMove = (e: PointerEvent) => {
+    if (!active.value) return;
+    onResize(Math.round(initW.current + e.clientX - startX.current));
+  };
 
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
-    },
-    [width, onResize],
+  const onPointerUp = (e: PointerEvent) => {
+    if (!active.value) return;
+    active.value = false;
+    document.body.classList.remove("is-resizing");
+    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+  };
+
+  return (
+    <div
+      className={`drag ${active.value ? "is-active" : ""}`}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onDblClick={onReset}
+    />
   );
-
-  return <div className="drag" onMouseDown={onMouseDown} />;
 }
