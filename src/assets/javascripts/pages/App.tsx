@@ -34,6 +34,14 @@ const THEME_COLORS: Record<string, string> = {
 
 const TITLE = document.title;
 
+// room kept for the article view when resizing the feed and item lists
+const MIN_ARTICLE_WIDTH = 300;
+
+function clampColumnWidth(width: number, min: number, otherColumnWidth: number): number {
+  const max = Math.max(min, window.innerWidth - otherColumnWidth - MIN_ARTICLE_WIDTH);
+  return Math.min(Math.max(min, width), max);
+}
+
 export default function App() {
   const { t, setLang } = useI18n();
   const appSettings = window.app?.settings || {};
@@ -112,12 +120,30 @@ export default function App() {
     setLang(settings.values.language.value);
   }, [settings.values.language.value, setLang]);
 
+  const setFeedListCollapsed = (collapsed: boolean) => {
+    if (settings.values.feed_list_collapsed.value === collapsed) return;
+    settings.update({ feed_list_collapsed: collapsed });
+  };
+
   const resizeFeedList = (w: number) => {
-    settings.update({ feed_list_width: Math.min(Math.max(200, w), 700) });
+    // dragging the feed list narrow enough collapses it, dragging it back out expands it
+    setFeedListCollapsed(w < 100);
+    if (settings.values.feed_list_collapsed.value) return;
+    settings.update({
+      feed_list_width: clampColumnWidth(w, 150, settings.values.item_list_width.value),
+    });
+  };
+
+  const resetFeedList = () => {
+    setFeedListCollapsed(false);
+    resizeFeedList(300);
   };
 
   const resizeItemList = (w: number) => {
-    settings.update({ item_list_width: Math.min(Math.max(200, w), 700) });
+    const feedListSpace = settings.values.feed_list_collapsed.value
+      ? 0
+      : settings.values.feed_list_width.value;
+    settings.update({ item_list_width: clampColumnWidth(w, 200, feedListSpace) });
   };
 
   // Computed signals
@@ -721,7 +747,7 @@ export default function App() {
           settings.values.feed_list_collapsed.value ? "is-collapsed" : ""
         }`}
         style={{ width: `${settings.values.feed_list_width.value}px` }}>
-        <Drag width={settings.values.feed_list_width.value} onResize={resizeFeedList} />
+        <Drag onResize={resizeFeedList} onReset={resetFeedList} />
         <div className="feed-list-header px-2 py-1 d-flex justify-content-between gap-2">
           <DropdownApp
             settings={settings}
@@ -827,7 +853,7 @@ export default function App() {
         id="col-item-list"
         className="vh-100 position-relative d-flex flex-column border-end flex-shrink-0"
         style={{ width: `${settings.values.item_list_width.value}px` }}>
-        <Drag width={settings.values.item_list_width.value} onResize={resizeItemList} />
+        <Drag onResize={resizeItemList} onReset={() => resizeItemList(300)} />
         <div className="px-2 py-1 d-flex gap-1 align-items-center">
           <Tooltip label={t("show_feeds")}>
             <button
