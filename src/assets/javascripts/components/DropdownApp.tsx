@@ -3,6 +3,7 @@ import type { Lang } from "../i18n";
 import Dropdown from "./Dropdown";
 import Icon from "./Icon";
 import Tooltip from "./Tooltip";
+import { UI_SIZE_MIN, UI_SIZE_MAX } from "../models/settings";
 import type { AppSettings, Theme } from "../models/settings";
 
 const THEMES: Theme[] = ["light", "sepia", "night", "system"];
@@ -23,6 +24,7 @@ interface DropdownAppProps {
   onShowShortcuts: () => void;
   requiresAuth: boolean;
   onLogout: () => void;
+  onUISizeChange: (delta: number) => void;
 }
 
 export default function DropdownApp({
@@ -30,8 +32,10 @@ export default function DropdownApp({
   onShowShortcuts,
   requiresAuth,
   onLogout,
+  onUISizeChange,
 }: DropdownAppProps) {
   const { t } = useI18n();
+  const uiSize = settings.values.ui_size.value;
 
   return (
     <Dropdown toggleClass="" drop="start" title={t("settings_main")} button={<Icon name="anchor" />}>
@@ -53,6 +57,38 @@ export default function DropdownApp({
             />
           </Tooltip>
         ))}
+      </div>
+
+      <div className="c-dropdown-divider" />
+      <div className="c-dropdown-header" role="heading" aria-level={2}>
+        {t("ui_size")}
+      </div>
+      <div className="row text-center m-0">
+        <button
+          type="button"
+          className="c-dropdown-item col-4 px-0"
+          style={{ fontSize: "0.8rem" }}
+          disabled={uiSize <= UI_SIZE_MIN}
+          onClick={e => {
+            e.stopPropagation();
+            onUISizeChange(-1);
+          }}>
+          A
+        </button>
+        <div className="col-4 d-flex align-items-center justify-content-center user-select-none">
+          {Math.round(uiSize * 100)}%
+        </div>
+        <button
+          type="button"
+          className="c-dropdown-item col-4 px-0"
+          style={{ fontSize: "1.2rem" }}
+          disabled={uiSize >= UI_SIZE_MAX}
+          onClick={e => {
+            e.stopPropagation();
+            onUISizeChange(1);
+          }}>
+          A
+        </button>
       </div>
 
       <div className="c-dropdown-divider" />

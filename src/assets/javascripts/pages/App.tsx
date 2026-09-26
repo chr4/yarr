@@ -20,7 +20,7 @@ import DropdownFolder from "../components/DropdownFolder";
 import ArticleView from "../components/ArticleView";
 import type { FeedTreeNode, TreeFeedNode } from "../components/FeedTree";
 import { setupKeybindings, KeyActions } from "../key";
-import { SettingsModel } from "../models/settings";
+import { SettingsModel, UI_SIZE_MIN, UI_SIZE_MAX } from "../models/settings";
 import type { Theme } from "../models/settings";
 import type { Feed, Folder, Item, FeedStat, ItemStatus, ItemListQuery } from "../api-types";
 
@@ -713,6 +713,14 @@ export default function App() {
         <div className="px-2 py-1 d-flex justify-content-between gap-2">
           <DropdownApp
             settings={settings}
+            onUISizeChange={delta => {
+              const size = +(settings.values.ui_size.value + 0.1 * delta).toFixed(1);
+              settings.update({ ui_size: Math.min(Math.max(UI_SIZE_MIN, size), UI_SIZE_MAX) });
+              document.documentElement.style.setProperty(
+                "--v-ui-scale",
+                String(settings.values.ui_size.value),
+              );
+            }}
             onShowShortcuts={() => (showModal.value = "shortcuts")}
             requiresAuth={window.app?.requiresAuth}
             onLogout={async () => {

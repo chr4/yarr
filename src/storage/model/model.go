@@ -168,6 +168,7 @@ type Settings struct {
 	ThemeName       string  `json:"theme_name"`
 	ThemeFont       string  `json:"theme_font"`
 	ThemeSize       float64 `json:"theme_size"`
+	UISize          float64 `json:"ui_size"`
 	RefreshRate     int64   `json:"refresh_rate"`
 	Language        string  `json:"language"`
 }
@@ -181,6 +182,7 @@ type UpdateSettingsParams struct {
 	ThemeName       *string  `json:"theme_name"`
 	ThemeFont       *string  `json:"theme_font"`
 	ThemeSize       *float64 `json:"theme_size"`
+	UISize          *float64 `json:"ui_size"`
 	RefreshRate     *int64   `json:"refresh_rate"`
 	Language        *string  `json:"language"`
 }
@@ -195,6 +197,7 @@ func (s Settings) Map() map[string]any {
 		"theme_name":        s.ThemeName,
 		"theme_font":        s.ThemeFont,
 		"theme_size":        s.ThemeSize,
+		"ui_size":           s.UISize,
 		"refresh_rate":      s.RefreshRate,
 		"language":          s.Language,
 	}
@@ -210,6 +213,7 @@ func SettingsDefault() Settings {
 		ThemeName:       "light",
 		ThemeFont:       "",
 		ThemeSize:       1,
+		UISize:          1,
 		RefreshRate:     0,
 		Language:        "en",
 	}
