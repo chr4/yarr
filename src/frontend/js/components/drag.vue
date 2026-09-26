@@ -1,31 +1,44 @@
 <template>
-  <div class="drag"></div>
+  <div class="drag" :class="{ 'is-active': active }"></div>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
 
 export default defineComponent({
-  props: ["width"],
+  emits: ["resize", "reset"],
+  data() {
+    return { active: false };
+  },
   mounted() {
-    var self = this;
+    const el = this.$el as HTMLElement;
     let startX = 0;
     let initW = 0;
-    var onMouseMove = function (e: MouseEvent) {
-      var offset = e.clientX - startX;
-      var newWidth = initW + offset;
-      self.$emit("resize", newWidth);
+    const onPointerMove = (e: PointerEvent) => {
+      this.$emit("resize", Math.round(initW + e.clientX - startX));
     };
-    var onMouseUp = function (e: MouseEvent) {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
+    const onPointerUp = (e: PointerEvent) => {
+      this.active = false;
+      document.body.classList.remove("is-resizing");
+      el.releasePointerCapture(e.pointerId);
+      el.removeEventListener("pointermove", onPointerMove);
+      el.removeEventListener("pointerup", onPointerUp);
+      el.removeEventListener("pointercancel", onPointerUp);
     };
-    this.$el.addEventListener("mousedown", function (e: MouseEvent) {
+    el.addEventListener("pointerdown", (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
       startX = e.clientX;
-      initW = self.width;
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
+      // measure the rendered column, it may differ from the stored width (e.g. when collapsed)
+      initW = el.parentElement!.getBoundingClientRect().width;
+      this.active = true;
+      document.body.classList.add("is-resizing");
+      el.setPointerCapture(e.pointerId);
+      el.addEventListener("pointermove", onPointerMove);
+      el.addEventListener("pointerup", onPointerUp);
+      el.addEventListener("pointercancel", onPointerUp);
     });
+    el.addEventListener("dblclick", () => this.$emit("reset"));
   },
 });
 </script>
