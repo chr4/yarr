@@ -43,6 +43,7 @@ export interface Settings {
   theme_name: string;
   theme_font: string;
   theme_size: number;
+  ui_size: number;
   refresh_rate: number;
   language: string;
 }
@@ -138,6 +139,7 @@ export interface SettingsUpdateData {
   theme_name?: string;
   theme_font?: string;
   theme_size?: number;
+  ui_size?: number;
   refresh_rate?: number;
   language?: string;
 }
