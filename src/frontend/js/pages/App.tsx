@@ -53,6 +53,14 @@ const REFRESH_RATE_OPTIONS = [
 
 const TITLE = document.title;
 
+// room kept for the article view when resizing the feed and item lists
+const MIN_ARTICLE_WIDTH = 300;
+
+function clampColumnWidth(width: number, min: number, otherColumnWidth: number): number {
+  const max = Math.max(min, window.innerWidth - otherColumnWidth - MIN_ARTICLE_WIDTH);
+  return Math.min(Math.max(min, width), max);
+}
+
 export default function App() {
   const { t, setLang } = useI18n();
   const appSettings = window.app?.settings || {};
@@ -155,13 +163,13 @@ export default function App() {
   );
 
   const resizeFeedList = (w: number) => {
-    const clamped = Math.min(Math.max(200, w), 700);
+    const clamped = clampColumnWidth(w, 150, itemListWidth.value);
     feedListWidth.value = clamped;
     saveFeedListWidth(clamped);
   };
 
   const resizeItemList = (w: number) => {
-    const clamped = Math.min(Math.max(200, w), 700);
+    const clamped = clampColumnWidth(w, 200, feedListWidth.value);
     itemListWidth.value = clamped;
     saveItemListWidth(clamped);
   };
@@ -783,7 +791,7 @@ export default function App() {
         id="col-feed-list"
         className="vh-100 position-relative d-flex flex-column border-end flex-shrink-0"
         style={{ width: `${feedListWidth.value}px` }}>
-        <Drag width={feedListWidth.value} onResize={resizeFeedList} />
+        <Drag onResize={resizeFeedList} onReset={() => resizeFeedList(300)} />
         <div className="px-2 py-1 d-flex justify-content-between gap-2">
           <DropdownApp
             theme={theme.value.name}
@@ -912,7 +920,7 @@ export default function App() {
         id="col-item-list"
         className="vh-100 position-relative d-flex flex-column border-end flex-shrink-0"
         style={{ width: `${itemListWidth.value}px` }}>
-        <Drag width={itemListWidth.value} onResize={resizeItemList} />
+        <Drag onResize={resizeItemList} onReset={() => resizeItemList(300)} />
         <div className="px-2 py-1 d-flex gap-1 align-items-center">
           <Tooltip label={t("show_feeds")}>
             <button
