@@ -329,11 +329,23 @@
 .drag {
   position: absolute;
   top: 0;
-  right: 0;
-  width: 6px;
+  right: -3px;
+  width: 7px;
   height: 100%;
   z-index: 900;
   cursor: col-resize;
   touch-action: none;
+  user-select: none;
+}
+
+@media (hover: hover) and (min-width: 992px) {
+  .drag:hover,
+  .drag.is-active {
+    background-color: var(--v-border-color);
+  }
+}
+
+body.is-resizing {
+  cursor: col-resize;
   user-select: none;
 }
