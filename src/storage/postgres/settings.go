@@ -38,6 +38,8 @@ func (s *PostgresStorage) GetSettings() model.Settings {
 			json.Unmarshal(val, &result.ThemeFont)
 		case "theme_size":
 			json.Unmarshal(val, &result.ThemeSize)
+		case "ui_size":
+			json.Unmarshal(val, &result.UISize)
 		case "refresh_rate":
 			json.Unmarshal(val, &result.RefreshRate)
 		case "language":
@@ -93,6 +95,9 @@ func (s *PostgresStorage) UpdateSettings(params model.UpdateSettingsParams) bool
 	}
 	if params.ThemeSize != nil {
 		errs = append(errs, update("theme_size", *params.ThemeSize))
+	}
+	if params.UISize != nil {
+		errs = append(errs, update("ui_size", *params.UISize))
 	}
 	if params.RefreshRate != nil {
 		errs = append(errs, update("refresh_rate", *params.RefreshRate))

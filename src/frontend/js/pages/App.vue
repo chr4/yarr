@@ -74,6 +74,31 @@
               v-for="t in ['light', 'sepia', 'night', 'system']"></button>
           </div>
 
+          <div class="c-dropdown-divider"></div>
+
+          <header class="c-dropdown-header" role="heading" aria-level="2">
+            {{ $t("ui_size") }}
+          </header>
+          <div class="row text-center m-0">
+            <button
+              class="c-dropdown-item col-4 px-0"
+              style="font-size: 0.8rem"
+              :disabled="uiSize <= UI_SIZE_MIN"
+              @click.stop="incrUISize(-1)">
+              A
+            </button>
+            <div class="col-4 d-flex align-items-center justify-content-center user-select-none">
+              {{ Math.round(uiSize * 100) }}%
+            </div>
+            <button
+              class="c-dropdown-item col-4 px-0"
+              style="font-size: 1.2rem"
+              :disabled="uiSize >= UI_SIZE_MAX"
+              @click.stop="incrUISize(1)">
+              A
+            </button>
+          </div>
+
           <div class="c-dropdown-divider" v-if="refreshAvailable"></div>
 
           <header class="c-dropdown-header" role="heading" aria-level="2" v-if="refreshAvailable">
@@ -546,6 +571,9 @@ import type {
 
 var app = window.app;
 
+const UI_SIZE_MIN = 0.8;
+const UI_SIZE_MAX = 1.6;
+
 declare module "vue" {
   interface ComponentCustomProperties {
     $refs: {
@@ -623,6 +651,9 @@ export default defineComponent({
       feeds: [] as Feed[],
       feedSelected: s.feed,
       feedListWidth: s.feed_list_width || 300,
+      uiSize: (s.ui_size || 1) as number,
+      UI_SIZE_MIN,
+      UI_SIZE_MAX,
       items: [] as Item[],
       itemsHasMore: true,
       itemSelected: null as number | null,
@@ -888,6 +919,10 @@ export default defineComponent({
         return;
       }
       this.refreshItems(false);
+    },
+    uiSize(newVal) {
+      document.documentElement.style.setProperty("--v-ui-scale", String(newVal));
+      api.settings.update({ ui_size: newVal });
     },
     feedListWidth: debounce(function (newVal, oldVal) {
       if (oldVal === undefined) return; // do nothing, initial setup
@@ -1294,6 +1329,10 @@ export default defineComponent({
     },
     incrFont(x: number) {
       this.theme.size = +(this.theme.size + 0.1 * x).toFixed(1);
+    },
+    incrUISize(x: number) {
+      const size = +(this.uiSize + 0.1 * x).toFixed(1);
+      this.uiSize = Math.min(Math.max(UI_SIZE_MIN, size), UI_SIZE_MAX);
     },
     async fetchAllFeeds() {
       if (this.loading.feeds) return;
