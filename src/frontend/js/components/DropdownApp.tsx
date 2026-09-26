@@ -7,6 +7,9 @@ import type { Theme } from "./DropdownSettings";
 
 const THEMES: Theme[] = ["light", "sepia", "night", "system"];
 
+export const UI_SIZE_MIN = 0.8;
+export const UI_SIZE_MAX = 1.6;
+
 const LANGUAGES: { code: Lang; name: string }[] = [
   { code: "en", name: "English" },
   { code: "de", name: "Deutsch" },
@@ -26,6 +29,8 @@ interface DropdownAppProps {
   onLanguageChange: (lang: Lang) => void;
   requiresAuth: boolean;
   onLogout: () => void;
+  uiSize: number;
+  onUISizeChange: (delta: number) => void;
 }
 
 export default function DropdownApp({
@@ -36,6 +41,8 @@ export default function DropdownApp({
   onLanguageChange,
   requiresAuth,
   onLogout,
+  uiSize,
+  onUISizeChange,
 }: DropdownAppProps) {
   const { t } = useI18n();
 
@@ -59,6 +66,38 @@ export default function DropdownApp({
             />
           </Tooltip>
         ))}
+      </div>
+
+      <div className="c-dropdown-divider" />
+      <div className="c-dropdown-header" role="heading" aria-level={2}>
+        {t("ui_size")}
+      </div>
+      <div className="row text-center m-0">
+        <button
+          type="button"
+          className="c-dropdown-item col-4 px-0"
+          style={{ fontSize: "0.8rem" }}
+          disabled={uiSize <= UI_SIZE_MIN}
+          onClick={e => {
+            e.stopPropagation();
+            onUISizeChange(-1);
+          }}>
+          A
+        </button>
+        <div className="col-4 d-flex align-items-center justify-content-center user-select-none">
+          {Math.round(uiSize * 100)}%
+        </div>
+        <button
+          type="button"
+          className="c-dropdown-item col-4 px-0"
+          style={{ fontSize: "1.2rem" }}
+          disabled={uiSize >= UI_SIZE_MAX}
+          onClick={e => {
+            e.stopPropagation();
+            onUISizeChange(1);
+          }}>
+          A
+        </button>
       </div>
 
       <div className="c-dropdown-divider" />

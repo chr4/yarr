@@ -3,7 +3,7 @@
 }
 
 html {
-  font-size: 15px !important;
+  font-size: calc(15px * var(--v-ui-scale, 1)) !important;
   overscroll-behavior: none;
 }
 
