@@ -70,7 +70,7 @@
 
 @media (max-width: 991.98px) {
   .drag {
-    cursor: default;
+    display: none;
   }
   .c-button-pill,
   .c-search input {
@@ -99,8 +99,7 @@
     left: 0;
   }
   #col-feed-list.is-collapsed #feed-list-scroll > *,
-  #col-feed-list.is-collapsed .feed-list-loading > :not(.c-spinner),
-  #col-feed-list.is-collapsed .drag {
+  #col-feed-list.is-collapsed .feed-list-loading > :not(.c-spinner) {
     display: none !important;
   }
 }
