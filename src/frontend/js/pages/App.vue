@@ -357,7 +357,12 @@
             </small>
             <small class="flex-shrink-0"><v-relative-time :val="item.date" :locale="language" /></small>
           </div>
-          <div class="text-break line-clamp-3">{{ item.title || $t("untitled") }}</div>
+          <div class="text-break line-clamp-3">
+            <span class="c-icon me-1" v-if="(feedsById[item.feed_id] || {}).icon">
+              <img :src="feedsById[item.feed_id].icon || undefined" alt="" loading="lazy" />
+            </span>
+            <v-icon class="me-1" name="rss" v-else />{{ item.title || $t("untitled") }}
+          </div>
         </a>
         <div class="text-center my-3" v-if="itemsHasMore">
           <span class="c-spinner"></span>
