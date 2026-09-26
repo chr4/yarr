@@ -326,13 +326,17 @@
         class="d-flex flex-column p-2 overflow-auto border-top flex-grow-1 gap-1"
         v-scroll="loadMoreItems"
         ref="itemlist">
-        <div
+        <a
           v-for="item in items"
           :key="item.id"
           class="c-listitem d-flex flex-column user-select-none"
+          :href="item.link || undefined"
+          target="_blank"
+          rel="noopener noreferrer"
+          draggable="false"
           role="radio"
           :aria-checked="itemSelected === item.id"
-          @click="itemSelected = item.id">
+          @click="selectItem($event, item)">
           <div
             style="line-height: 100%; opacity: 0.7; margin-bottom: 0.1rem"
             class="d-flex align-items-center">
@@ -354,7 +358,7 @@
             <small class="flex-shrink-0"><v-relative-time :val="item.date" :locale="language" /></small>
           </div>
           <div class="text-break line-clamp-3">{{ item.title || $t("untitled") }}</div>
-        </div>
+        </a>
         <div class="text-center my-3" v-if="itemsHasMore">
           <span class="c-spinner"></span>
         </div>
@@ -1205,6 +1209,12 @@ export default defineComponent({
       this.refreshStats();
       this.showModal = "";
       this.feedSelected = "feed:" + feed.id;
+    },
+    selectItem(e: MouseEvent, item: Item) {
+      // let modifier clicks (ctrl/cmd/shift) open the link natively
+      if (item.link && (e.ctrlKey || e.metaKey || e.shiftKey)) return;
+      e.preventDefault();
+      this.itemSelected = item.id;
     },
     async toggleItemStatus(item: Item, targetstatus: ItemStatus) {
       const fallbackstatus: ItemStatus = "read";
