@@ -89,6 +89,16 @@
     "zh": "主题",
     "ru": "Тема"
   },
+  "ui_size": {
+    "en": "Interface size",
+    "de": "Größe der Oberfläche",
+    "fr": "Taille de l'interface",
+    "es": "Tamaño de la interfaz",
+    "ja": "表示サイズ",
+    "pt": "Tamanho da interface",
+    "zh": "界面大小",
+    "ru": "Размер интерфейса"
+  },
   "auto_refresh": {
     "en": "Auto Refresh",
     "de": "Automatisch aktualisieren",
