@@ -546,6 +546,18 @@ import type {
 
 var app = window.app;
 
+const STATS_POLL_INTERVAL = 30 * 1000;
+
+function sameFeedStats(a: Record<number, FeedStat>, b: Record<number, FeedStat>): boolean {
+  const ids = Object.keys(b);
+  if (Object.keys(a).length !== ids.length) return false;
+  return ids.every(id => {
+    const x = a[+id];
+    const y = b[+id];
+    return !!x && x.unread === y.unread && x.starred === y.starred;
+  });
+}
+
 declare module "vue" {
   interface ComponentCustomProperties {
     $refs: {
@@ -611,9 +623,18 @@ export default defineComponent({
       this.refreshItems(false);
       this.computeStats();
     }
+
+    // pick up feeds refreshed in the background (auto-refresh, other clients)
+    this._pollTimer = window.setInterval(() => {
+      if (document.visibilityState === "visible") this.refreshStats();
+    }, STATS_POLL_INTERVAL);
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
   },
   beforeUnmount() {
     this._colorSchemeMql?.removeEventListener("change", this.updateMetaTheme);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    if (this._pollTimer) window.clearInterval(this._pollTimer);
+    if (this._statsTimer) window.clearTimeout(this._statsTimer);
   },
   data() {
     var s = app.settings;
@@ -685,6 +706,8 @@ export default defineComponent({
       ] as SettingsLanguage[],
 
       _colorSchemeMql: null as MediaQueryList | null,
+      _statsTimer: null as number | null,
+      _pollTimer: null as number | null,
     };
   },
   computed: {
@@ -938,7 +961,10 @@ export default defineComponent({
 
       document.documentElement.dataset.theme = this.theme.name;
     },
-    async refreshStats(loopMode?: boolean) {
+    onVisibilityChange() {
+      if (document.visibilityState === "visible") this.refreshStats();
+    },
+    async refreshStats() {
       const [err, data] = await to(api.status());
       if (err) {
         this.$refs.toast.addToast(
@@ -948,14 +974,24 @@ export default defineComponent({
         return;
       }
 
-      if (loopMode && !this.itemSelected) this.refreshItems();
-
       this.loading.feeds = data.running;
       this.refreshAvailable = data.refresh;
-      if (data.running) {
-        setTimeout(() => this.refreshStats(true), 500);
+      // poll while feeds are being refreshed, keeping a single polling loop
+      if (data.running && !this._statsTimer) {
+        this._statsTimer = window.setTimeout(() => {
+          this._statsTimer = null;
+          this.refreshStats();
+        }, 500);
       }
-      this.feedStats = data.stats.reduce((acc, stat) => ({ ...acc, [stat.feed_id]: stat }), {});
+      const oldStats = this.feedStats;
+      const newStats: Record<number, FeedStat> = data.stats.reduce(
+        (acc, stat) => ({ ...acc, [stat.feed_id]: stat }),
+        {},
+      );
+      this.feedStats = newStats;
+      if (Object.keys(oldStats).length && !sameFeedStats(oldStats, newStats)) {
+        this.mergeNewItems();
+      }
 
       const [feedErr, errors] = await to(api.feeds.list_errors());
       if (feedErr) {
@@ -1038,6 +1074,49 @@ export default defineComponent({
           this.refreshItems(true);
         }
       });
+    },
+    async mergeNewItems() {
+      // add items fetched in the background without resetting the list,
+      // so that the scroll position, selection and loaded pages are kept
+      if (this.feedSelected === null || this.loading.items) return;
+      if (!this.items.length) return this.refreshItems(false);
+
+      const query = this.getItemsQuery();
+      const [err, data] = await to(api.items.list(query));
+      if (err || this.loading.items) return;
+      if (JSON.stringify(query) !== JSON.stringify(this.getItemsQuery())) return;
+
+      const known = new Set(this.items.map(i => i.id));
+      const fresh = data.list.filter(i => !known.has(i.id));
+      // the whole first page is new, there may be a gap to the loaded items
+      if (data.has_more && fresh.length === data.list.length) return this.refreshItems(false);
+
+      // items sorted after the last loaded one arrive with the next page
+      const last = this.items[this.items.length - 1];
+      const added = this.itemsHasMore ? fresh.filter(i => this.compareItems(i, last) < 0) : fresh;
+      if (added.length) {
+        // keep the topmost visible entry in place when items are added above it
+        const el = this.$refs.itemlist;
+        const anchor = Array.from(el.children as HTMLCollectionOf<HTMLElement>).find(
+          c => c.offsetTop + c.offsetHeight > el.scrollTop,
+        );
+        const anchorTop = anchor?.offsetTop ?? 0;
+        this.items = this.items.concat(added).sort(this.compareItems);
+        this.$nextTick(() => {
+          if (anchor && el.scrollTop > 0) el.scrollTop += anchor.offsetTop - anchorTop;
+        });
+      }
+
+      // new items beyond the first page of a fully loaded list
+      if (!this.itemsHasMore && data.has_more) {
+        this.itemsHasMore = true;
+        this.refreshItems(true);
+      }
+    },
+    compareItems(a: Item, b: Item): number {
+      // same order as the server: by date, then by id
+      const diff = Date.parse(a.date) - Date.parse(b.date) || a.id - b.id;
+      return this.itemSortNewestFirst ? -diff : diff;
     },
     itemListCloseToBottom() {
       // approx. vertical space at the bottom of the list (loading el & paddings) when 1rem = 16px
