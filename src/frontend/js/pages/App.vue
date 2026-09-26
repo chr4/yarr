@@ -10,7 +10,7 @@
       id="col-feed-list"
       class="vh-100 position-relative d-flex flex-column border-end flex-shrink-0"
       :style="{ width: feedListWidth + 'px' }">
-      <v-drag :width="feedListWidth" @resize="resizeFeedList"></v-drag>
+      <v-drag @resize="resizeFeedList" @reset="feedListWidth = 300"></v-drag>
       <div class="px-2 py-1 d-flex align-items-center">
         <v-icon class="mx-2" name="anchor" />
         <div class="flex-grow-1"></div>
@@ -191,7 +191,7 @@
       id="col-item-list"
       class="vh-100 position-relative d-flex flex-column border-end flex-shrink-0"
       :style="{ width: itemListWidth + 'px' }">
-      <v-drag :width="itemListWidth" @resize="resizeItemList"></v-drag>
+      <v-drag @resize="resizeItemList" @reset="itemListWidth = 300"></v-drag>
       <div class="px-2 py-1 d-flex gap-1 align-items-center">
         <button
           class="c-button-pill d-md-none"
@@ -545,6 +545,14 @@ import type {
 } from "../api-types";
 
 var app = window.app;
+
+// room kept for the article view when resizing the feed and item lists
+const MIN_ARTICLE_WIDTH = 300;
+
+function clampColumnWidth(width: number, min: number, otherColumnWidth: number): number {
+  const max = Math.max(min, window.innerWidth - otherColumnWidth - MIN_ARTICLE_WIDTH);
+  return Math.min(Math.max(min, width), max);
+}
 
 declare module "vue" {
   interface ComponentCustomProperties {
@@ -1287,10 +1295,10 @@ export default defineComponent({
       }
     },
     resizeFeedList(width: number) {
-      this.feedListWidth = Math.min(Math.max(200, width), 700);
+      this.feedListWidth = clampColumnWidth(width, 150, this.itemListWidth);
     },
     resizeItemList(width: number) {
-      this.itemListWidth = Math.min(Math.max(200, width), 700);
+      this.itemListWidth = clampColumnWidth(width, 200, this.feedListWidth);
     },
     incrFont(x: number) {
       this.theme.size = +(this.theme.size + 0.1 * x).toFixed(1);
