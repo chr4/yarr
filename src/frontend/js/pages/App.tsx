@@ -53,6 +53,18 @@ const REFRESH_RATE_OPTIONS = [
 
 const TITLE = document.title;
 
+const STATS_POLL_INTERVAL = 30 * 1000;
+
+function sameFeedStats(a: Record<number, FeedStat>, b: Record<number, FeedStat>): boolean {
+  const ids = Object.keys(b);
+  if (Object.keys(a).length !== ids.length) return false;
+  return ids.every(id => {
+    const x = a[+id];
+    const y = b[+id];
+    return !!x && x.unread === y.unread && x.starred === y.starred;
+  });
+}
+
 export default function App() {
   const { t, setLang } = useI18n();
   const appSettings = window.app?.settings || {};
@@ -99,6 +111,8 @@ export default function App() {
   const contentRef = useRef<HTMLDivElement>(null);
   const menuDropdownRef = useRef<DropdownHandle>(null);
   const activeReqIdRef = useRef(0);
+  const statsTimerRef = useRef<number | undefined>(undefined);
+  const mergeNewItemsRef = useRef<() => void>(() => {});
 
   // Error helper
   const errDescription = useCallback(
@@ -236,7 +250,7 @@ export default function App() {
   }, [t, errDescription]);
 
   const refreshStats = useCallback(
-    async (loopMode?: boolean) => {
+    async () => {
       const [err, data] = await to(api.status());
       if (err) {
         showToast({ title: t("fail_load"), description: errDescription(err) }, { level: "fail" });
@@ -245,12 +259,23 @@ export default function App() {
 
       loadingFeeds.value = data.running;
       refreshAvailable.value = data.refresh;
-      if (data.running) setTimeout(() => refreshStats(true), 500);
+      // poll while feeds are being refreshed, keeping a single polling loop
+      if (data.running && !statsTimerRef.current) {
+        statsTimerRef.current = window.setTimeout(() => {
+          statsTimerRef.current = undefined;
+          refreshStatsRef.current();
+        }, 500);
+      }
 
-      feedStats.value = data.stats.reduce(
+      const oldStats = feedStats.value;
+      const newStats = data.stats.reduce(
         (acc, stat) => ({ ...acc, [stat.feed_id]: stat }),
         {} as Record<number, FeedStat>,
       );
+      feedStats.value = newStats;
+      if (Object.keys(oldStats).length && !sameFeedStats(oldStats, newStats)) {
+        mergeNewItemsRef.current();
+      }
 
       const [feedErr, errors] = await to(api.feeds.list_errors());
       if (feedErr) {
@@ -269,6 +294,22 @@ export default function App() {
     refreshStats();
     refreshFeeds();
   }, [refreshStats, refreshFeeds]);
+
+  // pick up feeds refreshed in the background (auto-refresh, other clients)
+  const refreshStatsRef = useRef(refreshStats);
+  refreshStatsRef.current = refreshStats;
+  useEffect(() => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") refreshStatsRef.current();
+    };
+    const timer = window.setInterval(refreshIfVisible, STATS_POLL_INTERVAL);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.clearTimeout(statsTimerRef.current);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
+  }, []);
 
   // Feed tree
   const mustHideFolder = (folder: Folder) =>
@@ -385,6 +426,54 @@ export default function App() {
     const timer = setTimeout(() => refreshItems(false), 500);
     return () => clearTimeout(timer);
   }, [itemSearch.value]);
+
+  // same order as the server: by date, then by id
+  const compareItems = (a: Item, b: Item): number => {
+    const diff = Date.parse(a.date) - Date.parse(b.date) || a.id - b.id;
+    return itemSortNewestFirst.value ? -diff : diff;
+  };
+
+  // add items fetched in the background without resetting the list,
+  // so that the scroll position, selection and loaded pages are kept
+  const mergeNewItems = async () => {
+    if (feedSelected.value === null || loadingItems.value) return;
+    if (!items.value.length) return refreshItems(false);
+
+    const query = getItemsQuery();
+    const [err, data] = await to(api.items.list(query));
+    if (err || loadingItems.value) return;
+    if (JSON.stringify(query) !== JSON.stringify(getItemsQuery())) return;
+
+    const known = new Set(items.value.map(i => i.id));
+    const fresh = data.list.filter(i => !known.has(i.id));
+    // the whole first page is new, there may be a gap to the loaded items
+    if (data.has_more && fresh.length === data.list.length) return refreshItems(false);
+
+    // items sorted after the last loaded one arrive with the next page
+    const last = items.value[items.value.length - 1];
+    const added = itemsHasMore.value ? fresh.filter(i => compareItems(i, last) < 0) : fresh;
+    if (added.length) {
+      // keep the topmost visible entry in place when items are added above it
+      const el = itemListRef.current;
+      const anchor =
+        el &&
+        Array.from(el.children as HTMLCollectionOf<HTMLElement>).find(
+          c => c.offsetTop + c.offsetHeight > el.scrollTop,
+        );
+      const anchorTop = anchor?.offsetTop ?? 0;
+      items.value = items.value.concat(added).sort(compareItems);
+      setTimeout(() => {
+        if (el && anchor && el.scrollTop > 0) el.scrollTop += anchor.offsetTop - anchorTop;
+      }, 0);
+    }
+
+    // new items beyond the first page of a fully loaded list
+    if (!itemsHasMore.value && data.has_more) {
+      itemsHasMore.value = true;
+      refreshItems(true);
+    }
+  };
+  mergeNewItemsRef.current = mergeNewItems;
 
   const loadMoreItems = useCallback(() => {
     if (!itemsHasMore.value || loadingItems.value) return;
