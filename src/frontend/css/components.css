@@ -195,6 +195,7 @@
 
 .c-listitem {
   padding: 0.375rem 0.5rem;
+  text-decoration: none;
   width: 100%;
   cursor: pointer;
   color: inherit;
