@@ -987,6 +987,13 @@ export default defineComponent({
     markReadOnScroll(newVal) {
       api.settings.update({ mark_read_on_scroll: newVal });
     },
+    items() {
+      // the old list is still rendered here. when everything was already scrolled past,
+      // new items would end up out of sight above the viewport
+      if (this.markReadOnScroll && this.itemListScrolledPast()) {
+        this.$nextTick(this.scrollToFirstUnread);
+      }
+    },
     async itemSortNewestFirst(newVal, oldVal) {
       if (oldVal === undefined) return;
       const [err] = await to(api.settings.update({ sort_newest_first: newVal }));
@@ -1419,6 +1426,21 @@ export default defineComponent({
     },
     toggleItemRead(item: Item) {
       this.toggleItemStatus(item, "unread");
+    },
+    itemListScrolledPast() {
+      const el = this.$refs.itemlist;
+      const items = el?.querySelectorAll(".c-listitem");
+      if (!items?.length || !el.clientHeight) return false;
+      const last = items[items.length - 1];
+      return last.getBoundingClientRect().bottom <= el.getBoundingClientRect().top + el.clientTop;
+    },
+    scrollToFirstUnread() {
+      const el = this.$refs.itemlist;
+      const item = this.items.find(i => i.status === "unread");
+      const target = item && el.querySelector(`[data-id="${item.id}"]`);
+      if (!target) return;
+      const offset = target.getBoundingClientRect().top - el.getBoundingClientRect().top;
+      el.scrollTop += offset - el.clientTop - parseFloat(getComputedStyle(el).paddingTop);
     },
     onItemIntersect(entries: IntersectionObserverEntry[]) {
       const scrolledOut: Item[] = [];
