@@ -38,6 +38,7 @@ export default function DropdownSettings({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refreshRate = settings.values.refresh_rate.value;
+  const markReadOnScroll = settings.values.mark_read_on_scroll.value;
   const refreshRateTitle =
     REFRESH_RATE_OPTIONS.find(o => o.value === refreshRate)?.title || "0";
   const maxRefreshRate =
@@ -111,6 +112,19 @@ export default function DropdownSettings({
           </div>
         </>
       )}
+
+      <div className="c-dropdown-divider" />
+      <button
+        type="button"
+        className="c-dropdown-item w-100 text-start d-flex gap-1"
+        aria-pressed={markReadOnScroll}
+        onClick={e => {
+          e.stopPropagation();
+          settings.update({ mark_read_on_scroll: !markReadOnScroll });
+        }}>
+        <Icon className="me-1" name={markReadOnScroll ? "check" : "circle"} />
+        {t("mark_read_on_scroll")}
+      </button>
 
       <div className="c-dropdown-divider" />
       <div className="c-dropdown-header" role="heading" aria-level={2}>
