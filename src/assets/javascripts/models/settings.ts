@@ -17,6 +17,7 @@ export const SettingsModel = createModel(
       feed_list_width: signal<number>(initial.feed_list_width || 300),
       item_list_width: signal<number>(initial.item_list_width || 300),
       sort_newest_first: signal<boolean>(initial.sort_newest_first ?? true),
+      mark_read_on_scroll: signal<boolean>(!!initial.mark_read_on_scroll),
       theme_name: signal<Theme>((initial.theme_name as Theme) || "system"),
       theme_font: signal<ThemeFont>((initial.theme_font as ThemeFont) || ""),
       theme_size: signal<number>(initial.theme_size || 1),
