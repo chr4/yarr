@@ -40,6 +40,7 @@ export interface Settings {
   feed_list_width: number;
   item_list_width: number;
   sort_newest_first: boolean;
+  mark_read_on_scroll: boolean;
   theme_name: string;
   theme_font: string;
   theme_size: number;
@@ -136,6 +137,7 @@ export interface SettingsUpdateData {
   feed_list_width?: number;
   item_list_width?: number;
   sort_newest_first?: boolean;
+  mark_read_on_scroll?: boolean;
   theme_name?: string;
   theme_font?: string;
   theme_size?: number;
