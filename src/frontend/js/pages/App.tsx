@@ -339,6 +339,23 @@ export default function App() {
     return el.scrollHeight - el.scrollTop - el.offsetHeight - spacerHeight < 70 * scale;
   };
 
+  const itemListScrolledPast = () => {
+    const el = itemListRef.current;
+    const listItems = el?.querySelectorAll(".c-listitem");
+    if (!el || !listItems?.length || !el.clientHeight) return false;
+    const last = listItems[listItems.length - 1];
+    return last.getBoundingClientRect().bottom <= el.getBoundingClientRect().top + el.clientTop;
+  };
+
+  const scrollToFirstUnread = () => {
+    const el = itemListRef.current;
+    const item = items.value.find(i => i.status === "unread");
+    const target = item && el?.querySelector(`[data-id="${item.id}"]`);
+    if (!el || !target) return;
+    const offset = target.getBoundingClientRect().top - el.getBoundingClientRect().top;
+    el.scrollTop += offset - el.clientTop - parseFloat(getComputedStyle(el).paddingTop);
+  };
+
   const refreshItems = useCallback(
     async (loadMore = false) => {
       if (feedSelected.value === null) {
@@ -372,7 +389,11 @@ export default function App() {
         return;
       }
 
+      // the old list is still rendered here. when everything was already scrolled past,
+      // new items would end up out of sight above the viewport
+      const scrolledPast = markReadOnScroll.value && itemListScrolledPast();
       items.value = loadMore ? items.value.concat(data.list) : data.list;
+      if (scrolledPast) setTimeout(scrollToFirstUnread, 0);
       itemsHasMore.value = data.has_more;
 
       if (data.has_more && !loadMore) {
