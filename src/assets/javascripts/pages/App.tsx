@@ -63,6 +63,7 @@ export default function App() {
 
   // Element refs
   const itemListRef = useRef<HTMLDivElement>(null);
+  const itemListSpacerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const menuDropdownRef = useRef<DropdownHandle>(null);
   const activeReqIdRef = useRef(0);
@@ -278,6 +279,15 @@ export default function App() {
     return query;
   }, []);
 
+  const itemListCloseToBottom = () => {
+    const el = itemListRef.current;
+    if (!el || el.scrollHeight === 0) return false; // the list is invisible (responsive design)
+    const scale = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
+    // the room added below the list to scroll the last articles past does not count
+    const spacerHeight = itemListSpacerRef.current?.offsetHeight || 0;
+    return el.scrollHeight - el.scrollTop - el.offsetHeight - spacerHeight < 70 * scale;
+  };
+
   const refreshItems = useCallback(
     async (loadMore = false) => {
       if (settings.values.feed.value === null) {
@@ -316,13 +326,7 @@ export default function App() {
 
       if (data.has_more && !loadMore) {
         setTimeout(() => {
-          const el = itemListRef.current;
-          if (!el || el.scrollHeight === 0) return;
-          const scale =
-            (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
-          if (el.scrollHeight - el.scrollTop - el.offsetHeight < 70 * scale) {
-            refreshItems(true);
-          }
+          if (itemListCloseToBottom()) refreshItems(true);
         }, 0);
       }
     },
@@ -345,12 +349,9 @@ export default function App() {
 
   const loadMoreItems = useCallback(() => {
     if (!itemsHasMore.value || loadingItems.value) return;
-    const el = itemListRef.current;
-    if (!el || el.scrollHeight === 0) return;
-    const scale = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
-    const closeToBottom = el.scrollHeight - el.scrollTop - el.offsetHeight < 70 * scale;
+    if (!itemListRef.current?.scrollHeight) return; // the list is invisible (responsive design)
     if (
-      closeToBottom ||
+      itemListCloseToBottom() ||
       (itemSelected.value &&
         items.value.length &&
         itemSelected.value === items.value[items.value.length - 1].id)
@@ -1028,6 +1029,14 @@ export default function App() {
             <div className={`text-center my-3 ${items.value.length === 0 ? "show-delayed" : ""}`}>
               <span className="c-spinner" />
             </div>
+          )}
+          {/* extra room, so that even the last article can be scrolled out of view */}
+          {settings.values.mark_read_on_scroll.value && items.value.length > 0 && (
+            <div
+              ref={itemListSpacerRef}
+              className="flex-shrink-0"
+              style={{ flexBasis: "calc(100% + 1rem)" }}
+            />
           )}
         </div>
 
