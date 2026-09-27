@@ -156,6 +156,10 @@
     background-color: var(--v-hover-bg);
   }
 
+  &.is-read:not(:hover, [aria-checked="true"]) {
+    opacity: 0.6;
+  }
+
   &[aria-checked="true"] {
     color: var(--v-active-fg);
     background-color: var(--v-active-bg);

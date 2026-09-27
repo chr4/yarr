@@ -339,6 +339,7 @@
           :data-id="item.id"
           v-observe="readObserver"
           class="c-listitem d-flex flex-column user-select-none"
+          :class="{ 'is-read': item.status === 'read' }"
           role="radio"
           :aria-checked="itemSelected === item.id"
           @click="itemSelected = item.id">
