@@ -367,6 +367,12 @@
         <div class="text-center my-3" v-if="itemsHasMore">
           <span class="c-spinner"></span>
         </div>
+        <!-- extra room, so that even the last article can be scrolled out of view -->
+        <div
+          class="flex-shrink-0"
+          style="flex-basis: calc(100% + 1rem)"
+          ref="itemlistSpacer"
+          v-if="markReadOnScroll && items.length"></div>
       </div>
       <div
         class="px-3 py-2 border-top text-danger text-break"
@@ -560,6 +566,7 @@ declare module "vue" {
   interface ComponentCustomProperties {
     $refs: {
       itemlist: HTMLElement;
+      itemlistSpacer: HTMLElement | undefined;
       content: HTMLElement;
       opmlInputForm: HTMLFormElement;
       menuDropdown: InstanceType<typeof dropdown>;
@@ -624,7 +631,9 @@ export default defineComponent({
     }
   },
   mounted() {
-    this.readObserver = new IntersectionObserver(this.onItemIntersect, { root: this.$refs.itemlist });
+    this.readObserver = new IntersectionObserver(this.onItemIntersect, {
+      root: this.$refs.itemlist,
+    });
   },
   beforeUnmount() {
     this.readObserver?.disconnect();
@@ -1069,7 +1078,9 @@ export default defineComponent({
 
       if (!el || el.scrollHeight === 0) return false; // element is invisible (responsive design)
 
-      var closeToBottom = el.scrollHeight - el.scrollTop - el.offsetHeight < bottomSpace * scale;
+      var spacerHeight = this.$refs.itemlistSpacer?.offsetHeight || 0;
+      var closeToBottom =
+        el.scrollHeight - el.scrollTop - el.offsetHeight - spacerHeight < bottomSpace * scale;
       return closeToBottom;
     },
     loadMoreItems() {
@@ -1289,7 +1300,9 @@ export default defineComponent({
 
       // update optimistically, so that scrolling back and forth does not send duplicate requests
       items.forEach(item => setStatus(item, "read"));
-      const results = await Promise.all(items.map(item => to(api.items.update(item.id, { status: "read" }))));
+      const results = await Promise.all(
+        items.map(item => to(api.items.update(item.id, { status: "read" }))),
+      );
 
       const failed = results.findIndex(([err]) => err);
       if (failed === -1) return;
@@ -1297,7 +1310,10 @@ export default defineComponent({
         if (err && items[i].status === "read") setStatus(items[i], "unread");
       });
       this.$refs.toast.addToast(
-        { title: this.$t("fail_update_article"), description: this.errDescription(results[failed][0]) },
+        {
+          title: this.$t("fail_update_article"),
+          description: this.errDescription(results[failed][0]),
+        },
         { level: "fail", closeable: false },
       );
     },
