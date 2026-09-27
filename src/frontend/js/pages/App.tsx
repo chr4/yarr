@@ -1101,7 +1101,9 @@ export default function App() {
             <div
               key={item.id}
               data-id={item.id}
-              className="c-listitem d-flex flex-column user-select-none"
+              className={`c-listitem d-flex flex-column user-select-none ${
+                item.status === "read" ? "is-read" : ""
+              }`}
               role="radio"
               aria-checked={itemSelected.value === item.id}
               onClick={() => (itemSelected.value = item.id)}>
