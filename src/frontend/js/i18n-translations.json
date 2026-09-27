@@ -89,6 +89,16 @@
     "zh": "优先显示",
     "ru": "Сначала"
   },
+  "mark_read_on_scroll": {
+    "en": "Mark as read on scroll",
+    "de": "Beim Scrollen als gelesen markieren",
+    "fr": "Marquer comme lu en défilant",
+    "es": "Marcar como leído al desplazarse",
+    "ja": "スクロールで既読にする",
+    "pt": "Marcar como lido ao rolar",
+    "zh": "滚动时标记为已读",
+    "ru": "Отмечать прочитанным при прокрутке"
+  },
   "new": {
     "en": "New",
     "de": "Neue",
