@@ -150,6 +150,13 @@
               {{ $t("old") }}
             </button>
           </div>
+          <button
+            class="c-dropdown-item w-100 text-start d-flex gap-1"
+            :aria-pressed="markReadOnScroll"
+            @click.stop="markReadOnScroll = !markReadOnScroll">
+            <v-icon class="me-1" :name="markReadOnScroll ? 'check' : 'circle'" />
+            {{ $t("mark_read_on_scroll") }}
+          </button>
           <div class="c-dropdown-divider"></div>
           <header class="c-dropdown-header" role="heading" aria-level="2">
             {{ $t("subscriptions") }}
@@ -361,6 +368,8 @@
         <a
           v-for="item in items"
           :key="item.id"
+          :data-id="item.id"
+          v-observe="readObserver"
           class="c-listitem d-flex flex-column user-select-none"
           :href="item.link || undefined"
           target="_blank"
@@ -573,7 +582,8 @@ import toast from "../components/toast.vue";
 import type { FeedTreeNode, TreeFeedNode, TreeFolderNode } from "../components/feedtree.vue";
 import scrollDir from "../directives/scroll";
 import focusDir from "../directives/focus";
-import { defineComponent } from "vue";
+import observeDir from "../directives/observe";
+import { defineComponent, markRaw } from "vue";
 import type {
   Feed,
   Folder,
@@ -646,6 +656,7 @@ export default defineComponent({
   directives: {
     scroll: scrollDir,
     focus: focusDir,
+    observe: observeDir,
   },
   async created() {
     this.updateMetaTheme();
@@ -682,7 +693,11 @@ export default defineComponent({
     }, STATS_POLL_INTERVAL);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
   },
+  mounted() {
+    this.readObserver = new IntersectionObserver(this.onItemIntersect, { root: this.$refs.itemlist });
+  },
   beforeUnmount() {
+    this.readObserver?.disconnect();
     this._colorSchemeMql?.removeEventListener("change", this.updateMetaTheme);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     if (this._pollTimer) window.clearInterval(this._pollTimer);
@@ -708,6 +723,7 @@ export default defineComponent({
       itemSearch: "",
       itemSortNewestFirst: s.sort_newest_first as boolean,
       itemListWidth: s.item_list_width || 300,
+      markReadOnScroll: !!s.mark_read_on_scroll,
 
       stats: { folders: {}, feeds: {}, total: { unread: 0, starred: 0 } } as {
         folders: Record<number, Stats>;
@@ -764,6 +780,8 @@ export default defineComponent({
       _colorSchemeMql: null as MediaQueryList | null,
       _statsTimer: null as number | null,
       _pollTimer: null as number | null,
+      readObserver: null as IntersectionObserver | null,
+      _seenItems: markRaw(new WeakSet<Element>()),
     };
   },
   computed: {
@@ -955,6 +973,9 @@ export default defineComponent({
     },
     itemSearch() {
       this.$debounce("watch:itemSearch", this.refreshItems, 500);
+    },
+    markReadOnScroll(newVal) {
+      api.settings.update({ mark_read_on_scroll: newVal });
     },
     async itemSortNewestFirst(newVal, oldVal) {
       if (oldVal === undefined) return;
@@ -1386,6 +1407,47 @@ export default defineComponent({
     },
     toggleItemRead(item: Item) {
       this.toggleItemStatus(item, "unread");
+    },
+    onItemIntersect(entries: IntersectionObserverEntry[]) {
+      const scrolledOut: Item[] = [];
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          this._seenItems.add(entry.target);
+          continue;
+        }
+        // ignore items that were never on screen (e.g. new items inserted above the viewport)
+        // and the hidden list on small screens
+        if (!this._seenItems.has(entry.target) || !entry.rootBounds?.height) continue;
+        // only items that left through the top were scrolled past
+        if (entry.boundingClientRect.bottom > entry.rootBounds.top) continue;
+        this._seenItems.delete(entry.target);
+        const id = Number((entry.target as HTMLElement).dataset.id);
+        const item = this.items.find(i => i.id === id);
+        if (item?.status === "unread") scrolledOut.push(item);
+      }
+      if (this.markReadOnScroll && scrolledOut.length) this.markScrolledItemsRead(scrolledOut);
+    },
+    async markScrolledItemsRead(items: Item[]) {
+      const setStatus = (item: Item, status: ItemStatus) => {
+        item.status = status;
+        if (this.itemSelectedDetails?.id === item.id) this.itemSelectedDetails.status = status;
+        const stat = this.feedStats[item.feed_id];
+        if (stat) stat.unread += status === "unread" ? 1 : -1;
+      };
+
+      // update optimistically, so that scrolling back and forth does not send duplicate requests
+      items.forEach(item => setStatus(item, "read"));
+      const results = await Promise.all(items.map(item => to(api.items.update(item.id, { status: "read" }))));
+
+      const failed = results.findIndex(([err]) => err);
+      if (failed === -1) return;
+      results.forEach(([err], i) => {
+        if (err && items[i].status === "read") setStatus(items[i], "unread");
+      });
+      this.$refs.toast.addToast(
+        { title: this.$t("fail_update_article"), description: this.errDescription(results[failed][0]) },
+        { level: "fail", closeable: false },
+      );
     },
     async importOPML(event: Event) {
       const input = event.target as HTMLInputElement;
