@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useCallback } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useMemo, useCallback } from "preact/hooks";
 import { useSignal, useComputed } from "@preact/signals";
 import type { Lang } from "../i18n";
 import { useI18n } from "../i18n";
@@ -85,6 +85,7 @@ export default function App() {
   const itemFullscreen = useSignal(false);
   const itemSearch = useSignal("");
   const itemSortNewestFirst = useSignal<boolean>(appSettings.sort_newest_first ?? true);
+  const markReadOnScroll = useSignal<boolean>(!!appSettings.mark_read_on_scroll);
 
   // Status & modal
   const showModal = useSignal<"" | "shortcuts">("");
@@ -99,6 +100,9 @@ export default function App() {
   const contentRef = useRef<HTMLDivElement>(null);
   const menuDropdownRef = useRef<DropdownHandle>(null);
   const activeReqIdRef = useRef(0);
+  const readObserverRef = useRef<IntersectionObserver | null>(null);
+  const observedItemsRef = useRef(new Set<Element>());
+  const seenItemsRef = useRef(new WeakSet<Element>());
 
   // Error helper
   const errDescription = useCallback(
@@ -479,6 +483,94 @@ export default function App() {
       itemSelectedDetails.value = { ...itemSelectedDetails.value, status: newstatus };
     }
   };
+
+  // Mark read on scroll
+  const markScrolledItemsRead = async (scrolled: Item[]) => {
+    const setStatus = (ids: Set<number>, status: ItemStatus) => {
+      const stats = { ...feedStats.value };
+      for (const item of scrolled) {
+        if (!ids.has(item.id)) continue;
+        const stat = stats[item.feed_id];
+        if (stat) stats[item.feed_id] = { ...stat, unread: stat.unread + (status === "unread" ? 1 : -1) };
+      }
+      feedStats.value = stats;
+      items.value = items.value.map(i => (ids.has(i.id) ? { ...i, status } : i));
+      if (itemSelectedDetails.value && ids.has(itemSelectedDetails.value.id)) {
+        itemSelectedDetails.value = { ...itemSelectedDetails.value, status };
+      }
+    };
+
+    // update optimistically, so that scrolling back and forth does not send duplicate requests
+    setStatus(new Set(scrolled.map(i => i.id)), "read");
+    const results = await Promise.all(
+      scrolled.map(item => to(api.items.update(item.id, { status: "read" }))),
+    );
+
+    const failed = results.findIndex(([err]) => err);
+    if (failed === -1) return;
+    // revert the failed ones, unless their status was changed in the meantime
+    const stillRead = new Set(items.value.filter(i => i.status === "read").map(i => i.id));
+    const revert = scrolled.filter((item, idx) => results[idx][0] && stillRead.has(item.id));
+    setStatus(new Set(revert.map(item => item.id)), "unread");
+    showToast(
+      { title: t("fail_update_article"), description: errDescription(results[failed][0]) },
+      { level: "fail", closeable: false },
+    );
+  };
+
+  const onItemIntersect = (entries: IntersectionObserverEntry[]) => {
+    const seen = seenItemsRef.current;
+    const scrolledOut: Item[] = [];
+    for (const entry of entries) {
+      // removed items are reported as not intersecting anymore
+      if (!entry.target.isConnected) continue;
+      if (entry.isIntersecting) {
+        seen.add(entry.target);
+        continue;
+      }
+      // ignore items that were never on screen (e.g. new items inserted above the viewport)
+      // and the hidden list on small screens
+      if (!seen.has(entry.target) || !entry.rootBounds?.height) continue;
+      // only items that left through the top were scrolled past
+      if (entry.boundingClientRect.bottom > entry.rootBounds.top) continue;
+      seen.delete(entry.target);
+      const id = Number((entry.target as HTMLElement).dataset.id);
+      const item = items.value.find(i => i.id === id);
+      if (item?.status === "unread") scrolledOut.push(item);
+    }
+    if (markReadOnScroll.value && scrolledOut.length) markScrolledItemsRead(scrolledOut);
+  };
+  const onItemIntersectRef = useRef(onItemIntersect);
+  onItemIntersectRef.current = onItemIntersect;
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(entries => onItemIntersectRef.current(entries), {
+      root: itemListRef.current,
+    });
+    readObserverRef.current = observer;
+    return () => observer.disconnect();
+  }, []);
+
+  // observe the rendered list items, before the browser computes the next intersections
+  useLayoutEffect(() => {
+    const observer = readObserverRef.current;
+    const list = itemListRef.current;
+    if (!observer || !list) return;
+    const observed = observedItemsRef.current;
+    const current = new Set(list.querySelectorAll(".c-listitem[data-id]"));
+    for (const el of observed) {
+      if (!current.has(el)) {
+        observer.unobserve(el);
+        observed.delete(el);
+      }
+    }
+    for (const el of current) {
+      if (!observed.has(el)) {
+        observer.observe(el);
+        observed.add(el);
+      }
+    }
+  });
 
   const markItemsRead = async () => {
     const markQuery = getItemsQuery();
@@ -861,6 +953,11 @@ export default function App() {
             onRefreshRateChange={changeRefreshRate}
             onFetchAllFeeds={fetchAllFeeds}
             onImportOPML={importOPML}
+            markReadOnScroll={markReadOnScroll.value}
+            onToggleMarkReadOnScroll={() => {
+              markReadOnScroll.value = !markReadOnScroll.value;
+              updateSettings({ mark_read_on_scroll: markReadOnScroll.value });
+            }}
             onShowNewFeed={() => (showNewFeed.value = true)}
           />
         </div>
@@ -1002,6 +1099,7 @@ export default function App() {
           {items.value.map(item => (
             <div
               key={item.id}
+              data-id={item.id}
               className="c-listitem d-flex flex-column user-select-none"
               role="radio"
               aria-checked={itemSelected.value === item.id}
