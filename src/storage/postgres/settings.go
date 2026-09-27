@@ -32,6 +32,8 @@ func (s *PostgresStorage) GetSettings() model.Settings {
 			json.Unmarshal(val, &result.ItemListWidth)
 		case "sort_newest_first":
 			json.Unmarshal(val, &result.SortNewestFirst)
+		case "mark_read_on_scroll":
+			json.Unmarshal(val, &result.MarkReadOnScroll)
 		case "theme_name":
 			json.Unmarshal(val, &result.ThemeName)
 		case "theme_font":
@@ -84,6 +86,9 @@ func (s *PostgresStorage) UpdateSettings(params model.UpdateSettingsParams) bool
 	}
 	if params.SortNewestFirst != nil {
 		errs = append(errs, update("sort_newest_first", *params.SortNewestFirst))
+	}
+	if params.MarkReadOnScroll != nil {
+		errs = append(errs, update("mark_read_on_scroll", *params.MarkReadOnScroll))
 	}
 	if params.ThemeName != nil {
 		errs = append(errs, update("theme_name", *params.ThemeName))
