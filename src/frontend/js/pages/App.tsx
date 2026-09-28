@@ -347,6 +347,19 @@ export default function App() {
     return last.getBoundingClientRect().bottom <= el.getBoundingClientRect().top + el.clientTop;
   };
 
+  const revealNewItems = async () => {
+    // read articles are kept in the unread view until the list is reloaded.
+    // drop them now, so that only what is left to read is shown
+    if (filterSelected.value === "unread") {
+      const unread = items.value.filter(i => i.status !== "read" || i.id === itemSelected.value);
+      if (unread.length < items.value.length) {
+        items.value = unread;
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    }
+    scrollToFirstUnread();
+  };
+
   const scrollToFirstUnread = () => {
     const el = itemListRef.current;
     const item = items.value.find(i => i.status === "unread");
@@ -393,7 +406,7 @@ export default function App() {
       // new items would end up out of sight above the viewport
       const scrolledPast = markReadOnScroll.value && itemListScrolledPast();
       items.value = loadMore ? items.value.concat(data.list) : data.list;
-      if (scrolledPast) setTimeout(scrollToFirstUnread, 0);
+      if (scrolledPast) setTimeout(revealNewItems, 0);
       itemsHasMore.value = data.has_more;
 
       if (data.has_more && !loadMore) {
