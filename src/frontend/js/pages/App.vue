@@ -912,7 +912,7 @@ export default defineComponent({
       // the old list is still rendered here. when everything was already scrolled past,
       // new items would end up out of sight above the viewport
       if (this.markReadOnScroll && this.itemListScrolledPast()) {
-        this.$nextTick(this.scrollToFirstUnread);
+        this.$nextTick(this.revealNewItems);
       }
     },
     async itemSortNewestFirst(newVal, oldVal) {
@@ -1285,6 +1285,18 @@ export default defineComponent({
       if (!items?.length || !el.clientHeight) return false;
       const last = items[items.length - 1];
       return last.getBoundingClientRect().bottom <= el.getBoundingClientRect().top + el.clientTop;
+    },
+    async revealNewItems() {
+      // read articles are kept in the unread view until the list is reloaded.
+      // drop them now, so that only what is left to read is shown
+      if (this.filterSelected === "unread") {
+        const unread = this.items.filter(i => i.status !== "read" || i.id === this.itemSelected);
+        if (unread.length < this.items.length) {
+          this.items = unread;
+          await this.$nextTick();
+        }
+      }
+      this.scrollToFirstUnread();
     },
     scrollToFirstUnread() {
       const el = this.$refs.itemlist;
