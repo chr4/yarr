@@ -15,8 +15,8 @@
           ]
         }}
       </div>
-      <div class="flex-shrink-0" v-if="filterSelected">
-        <span class="ps-2 text-end opacity-50">{{ stats.total[filterSelected] }}</span>
+      <div class="flex-shrink-0">
+        <span class="ps-2 text-end opacity-50">{{ count(stats.total) }}</span>
       </div>
     </div>
     <template
@@ -37,10 +37,8 @@
           <div class="flex-grow-1 min-w-0 text-truncate">
             {{ node.folder.title }}
           </div>
-          <div class="flex-shrink-0" v-if="filterSelected">
-            <span class="ps-2 text-end opacity-50">{{
-              stats.folders[node.folder.id]?.[filterSelected]
-            }}</span>
+          <div class="flex-shrink-0">
+            <span class="ps-2 text-end opacity-50">{{ count(stats.folders[node.folder.id]) }}</span>
           </div>
         </div>
         <div
@@ -63,8 +61,8 @@
               {{ feedNode.feed.title }}
             </div>
             <div class="flex-shrink-0 d-flex">
-              <span class="ps-2 text-end opacity-50" v-if="filterSelected">{{
-                stats.feeds[feedNode.feed.id]?.[filterSelected]
+              <span class="ps-2 text-end opacity-50">{{
+                count(stats.feeds[feedNode.feed.id])
               }}</span>
               <v-icon
                 class="flex-shrink-0"
@@ -91,9 +89,7 @@
             {{ node.feed.title }}
           </div>
           <div class="flex-shrink-0 d-flex">
-            <span class="ps-2 text-end opacity-50" v-if="filterSelected">{{
-              stats.feeds[node.feed.id]?.[filterSelected]
-            }}</span>
+            <span class="ps-2 text-end opacity-50">{{ count(stats.feeds[node.feed.id]) }}</span>
             <v-icon
               class="flex-shrink-0"
               :title="feedErrors[node.feed.id]"
@@ -140,5 +136,12 @@ export default defineComponent({
     feedErrors: { type: Object as PropType<Record<number, string>>, required: true },
   },
   emits: ["update:modelValue", "toggle-folder"],
+  methods: {
+    count(stat?: { unread: number; starred: number }) {
+      // the unread count in the "all" view, where feeds without unread articles are shown too
+      if (!this.filterSelected) return stat?.unread || "";
+      return stat?.[this.filterSelected];
+    },
+  },
 });
 </script>
