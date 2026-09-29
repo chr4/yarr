@@ -168,6 +168,13 @@ export default function App() {
     return { feeds: statsFeeds, folders: statsFolders, total: statsTotal };
   });
 
+  const unreadCount = useComputed(() => {
+    if (currentFeed.value) return stats.value.feeds[currentFeed.value.id]?.unread || 0;
+    if (currentFolder.value) return stats.value.folders[currentFolder.value.id]?.unread || 0;
+    if (settings.values.feed.value === "") return stats.value.total.unread;
+    return 0;
+  });
+
   // Keep document title in sync with unread count
   useEffect(() => {
     const unread = stats.value.total.unread;
@@ -858,6 +865,15 @@ export default function App() {
               }}
             />
           </div>
+
+          {unreadCount.value > 0 && (
+            <Tooltip label={t("unread_count", { count: unreadCount.value })}>
+              <span className="flex-shrink-0 d-flex align-items-center gap-1 px-1 small opacity-75 user-select-none">
+                <Icon small name="circle-full" />
+                {unreadCount.value}
+              </span>
+            </Tooltip>
+          )}
 
           {settings.values.filter.value === "unread" && (
             <Tooltip label={t("mark_all_read")}>
