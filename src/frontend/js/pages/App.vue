@@ -209,6 +209,12 @@
             :placeholder="$t('search_placeholder', { scope: searchScope })"
             @keydown.enter="($event.target as HTMLInputElement).blur()" />
         </div>
+        <span
+          class="flex-shrink-0 d-flex align-items-center gap-1 px-1 small opacity-75 user-select-none"
+          :title="$t('unread_count', { count: unreadCount })"
+          v-if="unreadCount">
+          <v-icon :small="true" name="circle-full" />{{ unreadCount }}
+        </span>
         <button
           class="c-button-pill"
           @click="markItemsRead()"
@@ -746,6 +752,12 @@ export default defineComponent({
       const folder = type == "folder" ? this.foldersById[guid] : null;
 
       return { type: type, feed: feed, folder: folder };
+    },
+    unreadCount(): number {
+      if (this.current.feed) return this.stats.feeds[this.current.feed.id]?.unread || 0;
+      if (this.current.folder) return this.stats.folders[this.current.folder.id]?.unread || 0;
+      if (this.feedSelected === "") return this.stats.total.unread;
+      return 0;
     },
     searchScope(): string {
       var type = (this.feedSelected || "").split(":", 2)[0];
