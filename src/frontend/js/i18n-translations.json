@@ -159,6 +159,16 @@
     "zh": "登出",
     "ru": "Выйти"
   },
+  "unread_count": {
+    "en": "{ $count } unread",
+    "de": "{ $count } ungelesen",
+    "fr": "{ $count } non lus",
+    "es": "{ $count } no leídos",
+    "ja": "未読 { $count } 件",
+    "pt": "{ $count } não lidos",
+    "zh": "{ $count } 篇未读",
+    "ru": "Непрочитанных: { $count }"
+  },
   "all_unread": {
     "en": "All Unread",
     "de": "Alle ungelesenen",
