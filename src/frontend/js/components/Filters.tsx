@@ -344,6 +344,16 @@ export default function Filters({
                 <span className="flex-shrink-0">·</span>
                 <span className="flex-shrink-0">{fieldLabel(f)}</span>
                 <span className="flex-grow-1" />
+                {f.blocked > 0 && (
+                  <Tooltip
+                    label={t("filter_pages_blocked", { count: f.blocked })}
+                    className="flex-shrink-0">
+                    <span className="d-flex align-items-center gap-1">
+                      <Icon name="alert-circle" />
+                      {f.blocked}
+                    </span>
+                  </Tooltip>
+                )}
                 {!f.enabled ? (
                   <span className="flex-shrink-0">{t("filter_paused")}</span>
                 ) : (
@@ -580,6 +590,14 @@ export default function Filters({
                 <div className="d-flex align-items-center gap-2 small opacity-75 mb-2 user-select-none">
                   <span className="c-spinner" />
                   {t("filter_pages_fetching", { count: p.pages.left })}
+                </div>
+              )}
+              {!!p.pages?.blocked && !p.error && (
+                <div
+                  className="filter-blocked d-flex align-items-start gap-2 small mb-2 px-2 py-1"
+                  role="status">
+                  <Icon name="alert-circle" className="flex-shrink-0 mt-1" />
+                  <span>{t("filter_pages_blocked_notice", { count: p.pages.blocked })}</span>
                 </div>
               )}
               {!patternEmpty.value && !p.loading && !p.error && !p.count && !p.pages?.fetching && (

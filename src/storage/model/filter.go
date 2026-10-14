@@ -14,6 +14,8 @@ type Filter struct {
 
 	// number of items currently hidden by this filter
 	Hidden int64 `json:"hidden"`
+	// number of article pages checked by this filter that are behind a captcha
+	Blocked int64 `json:"blocked"`
 }
 
 type FilterParams struct {
@@ -23,4 +25,12 @@ type FilterParams struct {
 	CaseSensitive bool   `json:"case_sensitive"`
 	FeedId        *int64 `json:"feed_id"`
 	Enabled       bool   `json:"enabled"`
+}
+
+// ItemPage is the article page of an item, as fetched for filters.
+type ItemPage struct {
+	Content string
+	// the site answered with a captcha or a similar challenge
+	// instead of the page, leaving the content empty
+	Blocked bool
 }

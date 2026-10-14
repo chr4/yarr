@@ -77,7 +77,7 @@ func (s *SQLiteStorage) CreateItems(items []model.Item) bool {
 			sql.Named("filter_id", item.FilterId),
 		).Scan(&id)
 		if err == nil && item.Page != nil {
-			err = setItemPage(tx, id, *item.Page)
+			err = setItemPage(tx, id, model.ItemPage{Content: *item.Page, Blocked: item.PageBlocked})
 		}
 		if err != nil {
 			log.Print(err)

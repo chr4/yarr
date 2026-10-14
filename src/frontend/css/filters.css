@@ -133,6 +133,13 @@
   }
 }
 
+/* article pages behind a captcha */
+.filter-blocked {
+  border-left: 2px solid hsl(48 100% 50%);
+  border-radius: 0 var(--bs-border-radius) var(--bs-border-radius) 0;
+  background-color: hsl(48 100% 50% / 0.15);
+}
+
 @media (max-width: 991.98px) {
   #app .filters-open #col-feed-list {
     display: none !important;

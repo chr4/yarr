@@ -10,6 +10,7 @@ var migrations = []func(*sql.Tx) error{
 	m01_initial,
 	m02_add_item_filters,
 	m03_add_item_pages,
+	m04_add_item_page_blocked,
 }
 
 var maxVersion = int64(len(migrations))
@@ -147,5 +148,10 @@ func m03_add_item_pages(tx *sql.Tx) error {
 			content text not null
 		);
 	`)
+	return err
+}
+
+func m04_add_item_page_blocked(tx *sql.Tx) error {
+	_, err := tx.Exec(`alter table item_pages add column blocked boolean not null default false`)
 	return err
 }
