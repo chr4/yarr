@@ -91,6 +91,10 @@ export default function App() {
   const itemListWidth = useSignal<number>(appSettings.item_list_width || 300);
   const items = useSignal<Item[]>([]);
   const itemsHasMore = useSignal(true);
+  // new items held back, because they would be added above the visible ones
+  const itemsPending = useSignal<Item[]>([]);
+  // the new items might not connect to the loaded ones, the list has to be reloaded
+  const itemsPendingGap = useSignal(false);
   const itemSelected = useSignal<number | null>(null);
   const itemSelectedDetails = useSignal<Item | null>(null);
   const itemSelectedReadability = useSignal("");
@@ -368,6 +372,10 @@ export default function App() {
 
   const refreshItems = useCallback(
     async (loadMore = false) => {
+      if (!loadMore) {
+        itemsPending.value = [];
+        itemsPendingGap.value = false;
+      }
       if (feedSelected.value === null) {
         items.value = [];
         itemsHasMore.value = false;
@@ -444,27 +452,21 @@ export default function App() {
     if (err || loadingItems.value) return;
     if (JSON.stringify(query) !== JSON.stringify(getItemsQuery())) return;
 
-    const known = new Set(items.value.map(i => i.id));
+    const known = new Set(items.value.concat(itemsPending.value).map(i => i.id));
     const fresh = data.list.filter(i => !known.has(i.id));
     // the whole first page is new, there may be a gap to the loaded items
-    if (data.has_more && fresh.length === data.list.length) return refreshItems(false);
+    if (data.has_more && fresh.length === data.list.length) {
+      itemsPending.value = itemsPending.value.concat(fresh);
+      itemsPendingGap.value = true;
+      return insertPendingItems();
+    }
 
     // items sorted after the last loaded one arrive with the next page
     const last = items.value[items.value.length - 1];
     const added = itemsHasMore.value ? fresh.filter(i => compareItems(i, last) < 0) : fresh;
     if (added.length) {
-      // keep the topmost visible entry in place when items are added above it
-      const el = itemListRef.current;
-      const anchor =
-        el &&
-        Array.from(el.children as HTMLCollectionOf<HTMLElement>).find(
-          c => c.offsetTop + c.offsetHeight > el.scrollTop,
-        );
-      const anchorTop = anchor?.offsetTop ?? 0;
-      items.value = items.value.concat(added).sort(compareItems);
-      setTimeout(() => {
-        if (el && anchor && el.scrollTop > 0) el.scrollTop += anchor.offsetTop - anchorTop;
-      }, 0);
+      itemsPending.value = itemsPending.value.concat(added);
+      insertPendingItems();
     }
 
     // new items beyond the first page of a fully loaded list
@@ -474,6 +476,54 @@ export default function App() {
     }
   };
   mergeNewItemsRef.current = mergeNewItems;
+
+  const insertPendingItems = () => {
+    // only add new items where they show up on screen or below it. added further up, they would
+    // be out of sight, and the visible entries could be pushed up out of view
+    const el = itemListRef.current;
+    if (!el || !itemsPending.value.length || !items.value.length) return;
+    const rows = el.querySelectorAll<HTMLElement>(".c-listitem");
+    if (rows.length !== items.value.length) return; // not rendered yet, retried on scroll
+    const viewTop = el.getBoundingClientRect().top + el.clientTop;
+    // nothing loaded is visible anymore, or the list is hidden (responsive design)
+    const all = !el.clientHeight || rows[rows.length - 1].getBoundingClientRect().bottom <= viewTop;
+
+    if (itemsPendingGap.value) {
+      if (all || el.scrollTop === 0) refreshItems(false);
+      return;
+    }
+
+    const insert = all
+      ? itemsPending.value
+      : itemsPending.value.filter(item => {
+          const index = items.value.findIndex(i => compareItems(item, i) < 0);
+          return index === -1 || rows[index].getBoundingClientRect().top >= viewTop;
+        });
+    if (!insert.length) return;
+    itemsPending.value = itemsPending.value.filter(i => !insert.includes(i));
+    // keep the scroll position, so that the entries below the new items move down. browsers with
+    // scroll anchoring would keep them in place instead and move the new items out of sight
+    const scrollTop = el.scrollTop;
+    items.value = items.value.concat(insert).sort(compareItems);
+    setTimeout(() => (el.scrollTop = scrollTop), 0);
+  };
+
+  const showPendingItems = async () => {
+    const el = itemListRef.current;
+    if (!el) return;
+    if (itemsPendingGap.value) {
+      el.scrollTop = 0;
+      return refreshItems(false);
+    }
+    const first = itemsPending.value.reduce((a, b) => (compareItems(a, b) < 0 ? a : b));
+    items.value = items.value.concat(itemsPending.value).sort(compareItems);
+    itemsPending.value = [];
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const row = el.querySelectorAll<HTMLElement>(".c-listitem")[items.value.indexOf(first)];
+    if (!row) return;
+    const offset = row.getBoundingClientRect().top - el.getBoundingClientRect().top;
+    el.scrollTop += offset - el.clientTop - parseFloat(getComputedStyle(el).paddingTop);
+  };
 
   const loadMoreItems = useCallback(() => {
     if (!itemsHasMore.value || loadingItems.value) return;
@@ -491,7 +541,16 @@ export default function App() {
     }
   }, [refreshItems]);
 
-  const onItemListScroll = useMemo(() => debounce(loadMoreItems, 200), [loadMoreItems]);
+  const insertPendingItemsRef = useRef(insertPendingItems);
+  insertPendingItemsRef.current = insertPendingItems;
+  const onItemListScroll = useMemo(
+    () =>
+      debounce(() => {
+        insertPendingItemsRef.current();
+        loadMoreItems();
+      }, 200),
+    [loadMoreItems],
+  );
 
   // Item details & auto-read
   useEffect(() => {
@@ -582,6 +641,8 @@ export default function App() {
       return;
     }
     items.value = [];
+    itemsPending.value = [];
+    itemsPendingGap.value = false;
     itemSelected.value = null;
     itemsHasMore.value = false;
     refreshStats();
@@ -1082,6 +1143,21 @@ export default function App() {
             </Tooltip>
           )}
         </div>
+
+        {/* new items that would be added above the visible ones. no height, so the list does not move */}
+        {itemsPending.value.length > 0 && (
+          <div className="position-relative">
+            <button
+              type="button"
+              className="c-button-pill c-pending-items position-absolute start-50 translate-middle-x mt-2 gap-1 align-items-center"
+              onClick={showPendingItems}>
+              <Icon name="chevron-up" />
+              {t("new_articles", {
+                count: itemsPending.value.length + (itemsPendingGap.value ? "+" : ""),
+              })}
+            </button>
+          </div>
+        )}
 
         <div
           id="item-list-scroll"
