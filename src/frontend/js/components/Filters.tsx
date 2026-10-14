@@ -7,9 +7,20 @@ import { debounce, to } from "../utils";
 import Icon from "./Icon";
 import RelativeTime from "./RelativeTime";
 import Tooltip from "./Tooltip";
-import type { Feed, Folder, Filter, FilterParams, FilterPreviewMatch } from "../api-types";
+import type {
+  Feed,
+  Folder,
+  Filter,
+  FilterParams,
+  FilterPreviewMatch,
+  FilterPreviewResponse,
+} from "../api-types";
 
 const PREVIEW_DELAY = 300;
+// asking again for the preview while article pages are fetched
+const PAGES_POLL_DELAY = 2000;
+
+type Field = "title" | "content" | "page";
 
 const EXAMPLES = [
   { pattern: "sponsored|advertisement", content: false },
@@ -24,22 +35,36 @@ interface Preview {
   error: string;
   count: number;
   list: FilterPreviewMatch[];
+  pages?: FilterPreviewResponse["pages"];
 }
 
 const EMPTY_PREVIEW: Preview = { loading: false, error: "", count: 0, list: [] };
 
 function emptyForm(): FilterParams {
-  return { pattern: "", match_content: false, case_sensitive: false, feed_id: null, enabled: true };
+  return {
+    pattern: "",
+    match_content: false,
+    match_page: false,
+    case_sensitive: false,
+    feed_id: null,
+    enabled: true,
+  };
 }
 
 function sameForm(a: FilterParams, b: FilterParams): boolean {
   return (
     a.pattern === b.pattern &&
     a.match_content === b.match_content &&
+    a.match_page === b.match_page &&
     a.case_sensitive === b.case_sensitive &&
     a.feed_id === b.feed_id &&
     a.enabled === b.enabled
   );
+}
+
+function fieldOf(f: Pick<FilterParams, "match_content" | "match_page">): Field {
+  if (f.match_page) return "page";
+  return f.match_content ? "content" : "title";
 }
 
 function regexLiteral(f: Pick<FilterParams, "pattern" | "case_sensitive">): string {
@@ -81,21 +106,25 @@ export default function Filters({
   const saveError = useSignal("");
   const preview = useSignal<Preview>(EMPTY_PREVIEW);
   const previewSeq = useRef(0);
+  const pagesPoll = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const patternRef = useRef<HTMLInputElement>(null);
 
   const original = (): FilterParams | null => {
     if (selected.value === "new") return emptyForm();
     const f = filters.find(f => f.id === selected.value);
     if (!f) return null;
-    const { pattern, match_content, case_sensitive, feed_id, enabled } = f;
-    return { pattern, match_content, case_sensitive, feed_id, enabled };
+    const { pattern, match_content, match_page, case_sensitive, feed_id, enabled } = f;
+    return { pattern, match_content, match_page, case_sensitive, feed_id, enabled };
   };
+  // pages are fetched only for the feeds that need them
+  const pageNeedsFeed = form.value.match_page && form.value.feed_id === null;
   const orig = original();
   const dirty = !!orig && !sameForm(form.value, orig);
   const canSave =
     !saving.value &&
     !!form.value.pattern.trim() &&
     !preview.value.error &&
+    !pageNeedsFeed &&
     (selected.value === "new" || dirty);
 
   const totalHidden = filters.reduce((sum, f) => sum + (f.enabled ? f.hidden : 0), 0);
@@ -116,7 +145,8 @@ export default function Filters({
   const patternEmpty = useComputed(() => !form.value.pattern.trim());
 
   const runPreview = async () => {
-    if (!form.value.pattern.trim()) return;
+    const f = form.value;
+    if (!f.pattern.trim() || (f.match_page && f.feed_id === null)) return;
     const seq = ++previewSeq.current;
     const [err, data] = await to(api.filters.preview({ ...form.value, enabled: true }));
     if (seq !== previewSeq.current) return; // the form changed in the meantime
@@ -124,7 +154,20 @@ export default function Filters({
       preview.value = EMPTY_PREVIEW;
       return;
     }
-    preview.value = { loading: false, error: data.error || "", count: data.count, list: data.list };
+    const wasFetching = !!preview.value.pages?.fetching;
+    preview.value = {
+      loading: false,
+      error: data.error || "",
+      count: data.count,
+      list: data.list,
+      pages: data.pages,
+    };
+    if (data.pages?.fetching) {
+      pagesPoll.current = setTimeout(() => runPreviewRef.current(), PAGES_POLL_DELAY);
+    } else if (wasFetching) {
+      // the fetched pages may have changed what saved filters hide
+      onChanged();
+    }
   };
   const runPreviewRef = useRef(runPreview);
   runPreviewRef.current = runPreview;
@@ -133,7 +176,8 @@ export default function Filters({
   // a changed form invalidates the save error and the preview
   useEffect(() => {
     saveError.value = "";
-    if (!form.value.pattern.trim()) {
+    clearTimeout(pagesPoll.current);
+    if (!form.value.pattern.trim() || pageNeedsFeed) {
       previewSeq.current++;
       preview.value = EMPTY_PREVIEW;
       return;
@@ -141,6 +185,17 @@ export default function Filters({
     preview.value = { ...preview.value, loading: true };
     schedulePreview();
   }, [form.value]);
+
+  useEffect(() => () => clearTimeout(pagesPoll.current), []);
+
+  const fieldLabel = (f: Pick<FilterParams, "match_content" | "match_page">): string => {
+    const field = fieldOf(f);
+    if (field === "page") return t("filter_field_page");
+    return field === "content" ? t("filter_field_content") : t("filter_field_title");
+  };
+
+  const setField = (field: Field) =>
+    updateForm({ match_content: field === "content", match_page: field === "page" });
 
   const updateForm = (partial: Partial<FilterParams>) => {
     form.value = { ...form.value, ...partial };
@@ -271,9 +326,7 @@ export default function Filters({
                 )}
                 <span className="text-truncate">{scopeTitle(f.feed_id)}</span>
                 <span className="flex-shrink-0">·</span>
-                <span className="flex-shrink-0">
-                  {f.match_content ? t("filter_field_content") : t("filter_field_title")}
-                </span>
+                <span className="flex-shrink-0">{fieldLabel(f)}</span>
                 <span className="flex-grow-1" />
                 {!f.enabled ? (
                   <span className="flex-shrink-0">{t("filter_paused")}</span>
@@ -373,15 +426,21 @@ export default function Filters({
                 <div className="c-segmented" role="group">
                   <button
                     type="button"
-                    aria-pressed={!form.value.match_content}
-                    onClick={() => updateForm({ match_content: false })}>
+                    aria-pressed={fieldOf(form.value) === "title"}
+                    onClick={() => setField("title")}>
                     {t("filter_field_title")}
                   </button>
                   <button
                     type="button"
-                    aria-pressed={form.value.match_content}
-                    onClick={() => updateForm({ match_content: true })}>
+                    aria-pressed={fieldOf(form.value) === "content"}
+                    onClick={() => setField("content")}>
                     {t("filter_field_content")}
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={fieldOf(form.value) === "page"}
+                    onClick={() => setField("page")}>
+                    {t("filter_field_page")}
                   </button>
                 </div>
                 <span>{t("filter_matches")}</span>
@@ -421,7 +480,10 @@ export default function Filters({
                 )}
               </div>
 
-              <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+              <div
+                className={`d-flex flex-wrap align-items-center gap-2 ${
+                  form.value.match_page ? "mb-1" : "mb-3"
+                }`}>
                 <label htmlFor="filter-scope">{t("filter_in")}</label>
                 <select
                   id="filter-scope"
@@ -444,6 +506,15 @@ export default function Filters({
                   ))}
                 </select>
               </div>
+              {form.value.match_page && (
+                <div className="small mb-3">
+                  {pageNeedsFeed ? (
+                    <span className="text-danger">{t("filter_page_needs_feed")}</span>
+                  ) : (
+                    <span className="opacity-75">{t("filter_page_hint")}</span>
+                  )}
+                </div>
+              )}
 
               <div className="d-flex flex-wrap align-items-center gap-2">
                 <label className="d-flex align-items-center gap-2 cursor-pointer user-select-none me-auto">
@@ -478,7 +549,13 @@ export default function Filters({
                   {p.loading && <span className="c-spinner ms-auto" />}
                 </div>
               )}
-              {!patternEmpty.value && !p.loading && !p.error && !p.count && (
+              {p.pages?.fetching && !p.error && (
+                <div className="d-flex align-items-center gap-2 small opacity-75 mb-2 user-select-none">
+                  <span className="c-spinner" />
+                  {t("filter_pages_fetching", { count: p.pages.missing })}
+                </div>
+              )}
+              {!patternEmpty.value && !p.loading && !p.error && !p.count && !p.pages?.fetching && (
                 <p className="opacity-75">{t("filter_no_matches")}</p>
               )}
               <div className={`d-flex flex-column gap-1 ${p.loading ? "opacity-50" : ""}`}>
