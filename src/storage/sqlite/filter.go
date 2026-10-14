@@ -147,9 +147,9 @@ func (s *SQLiteStorage) ListItemGUIDs(feedId int64) map[string]bool {
 	return result
 }
 
-// ListItemsWithoutPage returns the items among the newest of a feed whose
-// article page has not been fetched yet.
-func (s *SQLiteStorage) ListItemsWithoutPage(feedId int64, limit int) []model.Item {
+// ListPageItems returns the newest items of a feed, for fetching their
+// article pages: all of them, or only those without page yet.
+func (s *SQLiteStorage) ListPageItems(feedId int64, limit int, onlyMissing bool) []model.Item {
 	result := make([]model.Item, 0)
 	rows, err := s.db.Query(`
 		select i.id, i.feed_id, i.link
@@ -160,9 +160,9 @@ func (s *SQLiteStorage) ListItemsWithoutPage(feedId int64, limit int) []model.It
 			order by date desc, id desc
 			limit :limit
 		) i
-		where not exists (select 1 from item_pages p where p.item_id = i.id)
+		where not :only_missing or not exists (select 1 from item_pages p where p.item_id = i.id)
 		order by i.date desc, i.id desc
-	`, sql.Named("feed_id", feedId), sql.Named("limit", limit))
+	`, sql.Named("feed_id", feedId), sql.Named("limit", limit), sql.Named("only_missing", onlyMissing))
 	if err != nil {
 		log.Print(err)
 		return result

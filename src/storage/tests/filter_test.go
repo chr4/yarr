@@ -133,11 +133,11 @@ func TestItemPages(t *testing.T) {
 		}
 
 		// only the newest items are looked at
-		missing := db.ListItemsWithoutPage(feed.Id, 2)
+		missing := db.ListPageItems(feed.Id, 2, true)
 		if len(missing) != 2 || missing[0].Link != "http://example.com/3" || missing[1].Link != "http://example.com/2" {
 			t.Fatalf("expected the two newest items without page, got %+v", missing)
 		}
-		if missing := db.ListItemsWithoutPage(feed.Id, 1); len(missing) != 1 {
+		if missing := db.ListPageItems(feed.Id, 1, true); len(missing) != 1 {
 			t.Fatalf("expected one item without page, got %+v", missing)
 		}
 
@@ -147,8 +147,11 @@ func TestItemPages(t *testing.T) {
 		if !db.SetItemPages(map[int64]string{missing[0].Id: "<p>free</p>", missing[1].Id: ""}) {
 			t.Fatal("failed to store pages")
 		}
-		if missing := db.ListItemsWithoutPage(feed.Id, 10); len(missing) != 0 {
+		if missing := db.ListPageItems(feed.Id, 10, true); len(missing) != 0 {
 			t.Fatalf("expected no missing pages, got %+v", missing)
+		}
+		if all := db.ListPageItems(feed.Id, 10, false); len(all) != 3 {
+			t.Fatalf("expected all items to be listed for fetching again, got %+v", all)
 		}
 
 		pages := make(map[string]*string)

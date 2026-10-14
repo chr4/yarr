@@ -103,6 +103,7 @@ export default function Filters({
   const selected = useSignal<Selected>(null);
   const form = useSignal<FilterParams>(emptyForm());
   const saving = useSignal(false);
+  const refetching = useSignal(false);
   const saveError = useSignal("");
   const preview = useSignal<Preview>(EMPTY_PREVIEW);
   const previewSeq = useRef(0);
@@ -247,6 +248,21 @@ export default function Filters({
     updateForm({ pattern: data.pattern });
     onChanged();
     selected.value = saved.id;
+  };
+
+  const refetch = async () => {
+    if (typeof selected.value !== "number") return;
+    refetching.value = true;
+    const [err] = await to(api.filters.refetch(selected.value));
+    refetching.value = false;
+    // already fetching is fine, the preview shows the progress either way
+    if (err && !(err instanceof HTTPError && err.status === 409)) {
+      saveError.value =
+        t("fail_refetch") + (err instanceof HTTPError ? ` (${err.status} ${err.statusText})` : "");
+      return;
+    }
+    clearTimeout(pagesPoll.current);
+    runPreview();
   };
 
   const deleteFilter = async () => {
@@ -530,6 +546,17 @@ export default function Filters({
                     {t("revert")}
                   </button>
                 )}
+                {orig?.match_page && selected.value !== "new" && (
+                  <Tooltip label={t("filter_refetch_hint")}>
+                    <button
+                      type="button"
+                      className="c-button"
+                      disabled={dirty || refetching.value || !!p.pages?.fetching}
+                      onClick={refetch}>
+                      {t("filter_refetch")}
+                    </button>
+                  </Tooltip>
+                )}
                 <button type="submit" className="c-button c-button-primary" disabled={!canSave}>
                   {t("save")}
                 </button>
@@ -552,7 +579,7 @@ export default function Filters({
               {p.pages?.fetching && !p.error && (
                 <div className="d-flex align-items-center gap-2 small opacity-75 mb-2 user-select-none">
                   <span className="c-spinner" />
-                  {t("filter_pages_fetching", { count: p.pages.missing })}
+                  {t("filter_pages_fetching", { count: p.pages.left })}
                 </div>
               )}
               {!patternEmpty.value && !p.loading && !p.error && !p.count && !p.pages?.fetching && (
