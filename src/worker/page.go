@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
+	"net/http/cookiejar"
 	"strings"
 	"sync"
 
@@ -35,10 +37,36 @@ func FetchPage(url string) (string, error) {
 	if url == "" {
 		return "", errors.New("item has no link")
 	}
-	if IsInternalURL(url) {
+	return fetchPage(url, IsInternalURL)
+}
+
+func fetchPage(url string, internal func(url string) bool) (string, error) {
+	if internal(url) {
 		return "", fmt.Errorf("refusing to fetch internal address %s", url)
 	}
-	res, err := client.get(url)
+	// news sites often redirect until the cookie they set (e.g. for consent)
+	// comes back, so each page gets cookies of its own, kept for its redirects
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return "", err
+	}
+	httpClient := *client.httpClient
+	httpClient.Jar = jar
+	httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		if internal(req.URL.String()) {
+			return fmt.Errorf("refusing to follow redirect to internal address %s", req.URL)
+		}
+		return nil
+	}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", client.userAgent)
+	res, err := httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
