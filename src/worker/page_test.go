@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -142,4 +143,38 @@ func TestRefetchPages(t *testing.T) {
 			t.Errorf("expected the page of %s to be fetched again, got %v", item.Title, item.Page)
 		}
 	})
+}
+
+func TestFetchPageChallenge(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  int
+		header  string
+		body    string
+		blocked bool
+	}{
+		{"cloudflare header", 403, "challenge", "<title>Just a moment...</title>", true},
+		{"cloudflare script", 403, "", `<script src="/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1"></script>`, true},
+		{"datadome", 403, "", `<script src="https://ct.captcha-delivery.com/c.js"></script>`, true},
+		{"captcha on error page", 429, "", `<script src="https://www.google.com/recaptcha/api.js"></script>`, true},
+		{"captcha on article", 200, "", `<p>news</p><script src="https://www.google.com/recaptcha/api.js"></script>`, false},
+		{"paywall", 402, "", `<p>Subscribe to read on</p>`, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tt.header != "" {
+					w.Header().Set("Cf-Mitigated", tt.header)
+				}
+				w.WriteHeader(tt.status)
+				w.Write([]byte(tt.body))
+			}))
+			defer srv.Close()
+
+			page, err := fetchPage(srv.URL, func(string) bool { return false })
+			if blocked := errors.Is(err, ErrBlocked); blocked != tt.blocked {
+				t.Fatalf("expected blocked %v, got %q, %v", tt.blocked, page, err)
+			}
+		})
+	}
 }

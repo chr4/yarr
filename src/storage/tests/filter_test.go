@@ -144,7 +144,10 @@ func TestItemPages(t *testing.T) {
 		// arriving again leaves the stored page alone
 		db.CreateItems([]model.Item{{GUID: "paywalled", FeedId: feed.Id, Title: "one", Date: time.Now()}})
 
-		if !db.SetItemPages(map[int64]string{missing[0].Id: "<p>free</p>", missing[1].Id: ""}) {
+		if !db.SetItemPages(map[int64]model.ItemPage{
+			missing[0].Id: {Content: "<p>free</p>"},
+			missing[1].Id: {Blocked: true},
+		}) {
 			t.Fatal("failed to store pages")
 		}
 		if missing := db.ListPageItems(feed.Id, 10, true); len(missing) != 0 {
@@ -170,6 +173,12 @@ func TestItemPages(t *testing.T) {
 		})
 		if !db.ListFilters()[0].MatchPage {
 			t.Fatal("expected the filter to check the page")
+		}
+		if n := db.CountBlockedPages(feed.Id); n != 1 {
+			t.Fatalf("expected one blocked page, got %d", n)
+		}
+		if n := db.ListFilters()[0].Blocked; n != 1 {
+			t.Fatalf("expected the filter to report one blocked page, got %d", n)
 		}
 		if err := filter.Refilter(db); err != nil {
 			t.Fatal(err)

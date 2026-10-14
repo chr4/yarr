@@ -10,6 +10,7 @@ import (
 
 type Storage interface {
 	Close() error
+	CountBlockedPages(feedId int64) int
 	CountItems() int
 	CreateFeed(params model.CreateFeedParams) *model.Feed
 	CreateFilter(params model.FilterParams) *model.Filter
@@ -35,7 +36,7 @@ type Storage interface {
 	ListPageItems(feedId int64, limit int, onlyMissing bool) []model.Item
 	MarkItemsRead(filter model.MarkFilter) bool
 	SetItemFilters(filterIds map[int64]*int64) bool
-	SetItemPages(pages map[int64]string) bool
+	SetItemPages(pages map[int64]model.ItemPage) bool
 	UpdateFeed(feedId int64, params model.UpdateFeedParams) (bool, error)
 	UpdateFeedState(feedID int64, params model.UpdateFeedStateParams) (bool, error)
 	UpdateFilter(id int64, params model.FilterParams) bool
