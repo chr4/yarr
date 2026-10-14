@@ -1,6 +1,8 @@
 package worker
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -71,5 +73,42 @@ func TestFetchNewPages(t *testing.T) {
 	w.fetchNewPages(db, *other, otherItems)
 	if otherItems[0].Page != nil {
 		t.Error("expected no page for a feed without page filter")
+	}
+}
+
+func TestFetchPageCookieRedirect(t *testing.T) {
+	wrk := NewWorker(nil, client.NewBuilder().Build())
+	// redirects until the cookie it sets comes back, like many consent pages
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, err := r.Cookie("consent"); err != nil {
+			http.SetCookie(w, &http.Cookie{Name: "consent", Value: "1", Path: "/"})
+			http.Redirect(w, r, r.URL.Path, http.StatusFound)
+			return
+		}
+		w.Write([]byte(`<p>Subscribe to read on</p>`))
+	}))
+	defer srv.Close()
+
+	page, err := wrk.fetchPage(srv.URL+"/article", func(string) bool { return false })
+	if err != nil || page != "<p>Subscribe to read on </p>" {
+		t.Fatalf("expected the page after the redirect, got %q, %v", page, err)
+	}
+}
+
+func TestFetchPageInternalRedirect(t *testing.T) {
+	wrk := NewWorker(nil, client.NewBuilder().Build())
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/secret" {
+			w.Write([]byte("secret"))
+			return
+		}
+		http.Redirect(w, r, "/secret", http.StatusFound)
+	}))
+	defer srv.Close()
+
+	// only the redirect target counts as internal here
+	internal := func(url string) bool { return strings.HasSuffix(url, "/secret") }
+	if page, err := wrk.fetchPage(srv.URL+"/article", internal); err == nil {
+		t.Fatalf("expected a redirect to an internal address to be refused, got %q", page)
 	}
 }
