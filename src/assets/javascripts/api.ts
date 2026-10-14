@@ -15,6 +15,9 @@ import type {
   ItemListQuery,
   SettingsUpdateData,
   ItemMarkQuery,
+  Filter,
+  FilterParams,
+  FilterPreviewResponse,
 } from "./api-types";
 
 export class HTTPError extends Error {
@@ -132,6 +135,23 @@ export default {
     mark_read(query: ItemMarkQuery): Promise<Response> {
       // TODO: fix query annotation
       return api("put", "./api/items", { query: query as Record<string, string> });
+    },
+  },
+  filters: {
+    list(): Promise<Filter[]> {
+      return api("get", "./api/filters").then(json<Filter[]>);
+    },
+    create(data: FilterParams): Promise<Filter> {
+      return api("post", "./api/filters", { json: data }).then(json<Filter>);
+    },
+    update(id: number, data: FilterParams): Promise<Filter> {
+      return api("put", `./api/filters/${id}`, { json: data }).then(json<Filter>);
+    },
+    delete(id: number): Promise<Response> {
+      return api("delete", `./api/filters/${id}`);
+    },
+    preview(data: FilterParams): Promise<FilterPreviewResponse> {
+      return api("post", "./api/filters/preview", { json: data }).then(json<FilterPreviewResponse>);
     },
   },
   settings: {
