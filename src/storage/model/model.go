@@ -82,6 +82,8 @@ type Item struct {
 
 	// text of the article page, for filters checking it; nil if not fetched
 	Page *string `json:"-"`
+	// the site answered with a captcha instead of the page
+	PageBlocked bool `json:"-"`
 }
 
 type ItemStatus int

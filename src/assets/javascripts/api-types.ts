@@ -154,6 +154,8 @@ export interface FilterParams {
 export interface Filter extends FilterParams {
   id: number;
   hidden: number;
+  // article pages checked by the filter that are behind a captcha
+  blocked: number;
 }
 
 export interface FilterPreviewMatch {
@@ -173,5 +175,5 @@ export interface FilterPreviewResponse {
   count: number;
   list: FilterPreviewMatch[];
   // only for filters checking the article page
-  pages?: { fetching: boolean; left: number };
+  pages?: { fetching: boolean; left: number; blocked: number };
 }

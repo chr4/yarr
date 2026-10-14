@@ -12,7 +12,11 @@ func (s *PostgresStorage) ListFilters() []model.Filter {
 	rows, err := s.db.Query(`
 		select
 			f.id, f.pattern, f.match_content, f.match_page, f.case_sensitive, f.feed_id, f.enabled,
-			(select count(*) from items i where i.filter_id = f.id and i.status != $1)
+			(select count(*) from items i where i.filter_id = f.id and i.status != $1),
+			case when f.match_page then (
+				select count(*) from item_pages p join items i on i.id = p.item_id
+				where i.feed_id = f.feed_id and p.blocked
+			) else 0 end
 		from filters f
 		order by f.id
 	`, model.STARRED)
@@ -26,7 +30,7 @@ func (s *PostgresStorage) ListFilters() []model.Filter {
 		var f model.Filter
 		err = rows.Scan(
 			&f.Id, &f.Pattern, &f.MatchContent, &f.MatchPage, &f.CaseSensitive, &f.FeedId, &f.Enabled,
-			&f.Hidden,
+			&f.Hidden, &f.Blocked,
 		)
 		if err != nil {
 			log.Print(err)
@@ -180,7 +184,7 @@ func (s *PostgresStorage) ListPageItems(feedId int64, limit int, onlyMissing boo
 	return result
 }
 
-func (s *PostgresStorage) SetItemPages(pages map[int64]string) bool {
+func (s *PostgresStorage) SetItemPages(pages map[int64]model.ItemPage) bool {
 	tx, err := s.db.Begin()
 	if err != nil {
 		log.Print(err)
@@ -188,8 +192,8 @@ func (s *PostgresStorage) SetItemPages(pages map[int64]string) bool {
 	}
 	defer tx.Rollback()
 
-	for id, content := range pages {
-		if err := setItemPage(tx, id, content); err != nil {
+	for id, page := range pages {
+		if err := setItemPage(tx, id, page); err != nil {
 			log.Print(err)
 			return false
 		}
@@ -201,13 +205,26 @@ func (s *PostgresStorage) SetItemPages(pages map[int64]string) bool {
 	return true
 }
 
-func setItemPage(tx *sql.Tx, itemId int64, content string) error {
+func setItemPage(tx *sql.Tx, itemId int64, page model.ItemPage) error {
 	_, err := tx.Exec(`
-		insert into item_pages (item_id, content) values ($1, $2)
-		on conflict (item_id) do update set content = excluded.content`,
-		itemId, content,
+		insert into item_pages (item_id, content, blocked) values ($1, $2, $3)
+		on conflict (item_id) do update set content = excluded.content, blocked = excluded.blocked`,
+		itemId, page.Content, page.Blocked,
 	)
 	return err
+}
+
+func (s *PostgresStorage) CountBlockedPages(feedId int64) int {
+	var count int
+	err := s.db.QueryRow(`
+		select count(*) from item_pages p join items i on i.id = p.item_id
+		where i.feed_id = $1 and p.blocked`,
+		feedId,
+	).Scan(&count)
+	if err != nil {
+		log.Print(err)
+	}
+	return count
 }
 
 func (s *PostgresStorage) SetItemFilters(filterIds map[int64]*int64) bool {
