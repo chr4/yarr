@@ -12,6 +12,8 @@ import circleFull from "../svg/circle-full.svg" with { type: "text" };
 import download from "../svg/download.svg" with { type: "text" };
 import edit from "../svg/edit.svg" with { type: "text" };
 import externalLink from "../svg/external-link.svg" with { type: "text" };
+import eyeOff from "../svg/eye-off.svg" with { type: "text" };
+import filter from "../svg/filter.svg" with { type: "text" };
 import folder from "../svg/folder.svg" with { type: "text" };
 import folderMinus from "../svg/folder-minus.svg" with { type: "text" };
 import folderPlus from "../svg/folder-plus.svg" with { type: "text" };
@@ -46,6 +48,8 @@ export default {
   download,
   edit,
   "external-link": externalLink,
+  "eye-off": eyeOff,
+  filter,
   folder,
   "folder-minus": folderMinus,
   "folder-plus": folderPlus,

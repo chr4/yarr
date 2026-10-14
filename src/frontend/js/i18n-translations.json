@@ -549,6 +549,256 @@
     "zh": "取消",
     "ru": "отмена"
   },
+  "filters": {
+    "en": "Filters",
+    "de": "Filter",
+    "fr": "Filtres",
+    "es": "Filtros",
+    "ja": "フィルター",
+    "pt": "Filtros",
+    "zh": "过滤器",
+    "ru": "Фильтры"
+  },
+  "filters_hidden": {
+    "en": "{ $count } hidden",
+    "de": "{ $count } ausgeblendet",
+    "fr": "{ $count } masqués",
+    "es": "{ $count } ocultos",
+    "ja": "{ $count } 件を非表示",
+    "pt": "{ $count } ocultos",
+    "zh": "已隐藏 { $count } 篇",
+    "ru": "Скрыто: { $count }"
+  },
+  "new_filter": {
+    "en": "New filter",
+    "de": "Neuer Filter",
+    "fr": "Nouveau filtre",
+    "es": "Nuevo filtro",
+    "ja": "新しいフィルター",
+    "pt": "Novo filtro",
+    "zh": "新建过滤器",
+    "ru": "Новый фильтр"
+  },
+  "edit_filter": {
+    "en": "Edit filter",
+    "de": "Filter bearbeiten",
+    "fr": "Modifier le filtre",
+    "es": "Editar filtro",
+    "ja": "フィルターを編集",
+    "pt": "Editar filtro",
+    "zh": "编辑过滤器",
+    "ru": "Изменить фильтр"
+  },
+  "filter_similar": {
+    "en": "Filter similar articles",
+    "de": "Ähnliche Artikel filtern",
+    "fr": "Filtrer les articles similaires",
+    "es": "Filtrar artículos similares",
+    "ja": "似た記事をフィルター",
+    "pt": "Filtrar artigos semelhantes",
+    "zh": "过滤类似文章",
+    "ru": "Фильтровать похожие статьи"
+  },
+  "filter_hide_when": {
+    "en": "Hide articles when the",
+    "de": "Artikel ausblenden, wenn der",
+    "fr": "Masquer les articles quand le",
+    "es": "Ocultar artículos cuando el",
+    "ja": "次の条件で記事を非表示:",
+    "pt": "Ocultar artigos quando o",
+    "zh": "隐藏文章，当其",
+    "ru": "Скрывать статьи, если"
+  },
+  "filter_field_title": {
+    "en": "title",
+    "de": "Titel",
+    "fr": "titre",
+    "es": "título",
+    "ja": "タイトル",
+    "pt": "título",
+    "zh": "标题",
+    "ru": "заголовок"
+  },
+  "filter_field_content": {
+    "en": "title or content",
+    "de": "Titel oder Inhalt",
+    "fr": "titre ou contenu",
+    "es": "título o contenido",
+    "ja": "タイトルか本文",
+    "pt": "título ou conteúdo",
+    "zh": "标题或正文",
+    "ru": "заголовок или текст"
+  },
+  "filter_matches": {
+    "en": "matches",
+    "de": "passt auf",
+    "fr": "correspond à",
+    "es": "coincide con",
+    "ja": "が一致",
+    "pt": "corresponde a",
+    "zh": "匹配",
+    "ru": "совпадает с"
+  },
+  "filter_in": {
+    "en": "in",
+    "de": "in",
+    "fr": "dans",
+    "es": "en",
+    "ja": "対象",
+    "pt": "em",
+    "zh": "范围",
+    "ru": "в"
+  },
+  "filter_case_sensitive": {
+    "en": "Match case",
+    "de": "Groß-/Kleinschreibung beachten",
+    "fr": "Respecter la casse",
+    "es": "Distinguir mayúsculas",
+    "ja": "大文字と小文字を区別",
+    "pt": "Diferenciar maiúsculas",
+    "zh": "区分大小写",
+    "ru": "Учитывать регистр"
+  },
+  "filter_enabled": {
+    "en": "Enabled",
+    "de": "Aktiv",
+    "fr": "Activé",
+    "es": "Activado",
+    "ja": "有効",
+    "pt": "Ativado",
+    "zh": "已启用",
+    "ru": "Включён"
+  },
+  "filter_paused": {
+    "en": "paused",
+    "de": "pausiert",
+    "fr": "en pause",
+    "es": "en pausa",
+    "ja": "一時停止中",
+    "pt": "pausado",
+    "zh": "已暂停",
+    "ru": "приостановлен"
+  },
+  "filter_matching": {
+    "en": "Matching articles: { $count }",
+    "de": "Passende Artikel: { $count }",
+    "fr": "Articles correspondants : { $count }",
+    "es": "Artículos coincidentes: { $count }",
+    "ja": "一致する記事: { $count }",
+    "pt": "Artigos correspondentes: { $count }",
+    "zh": "匹配的文章：{ $count }",
+    "ru": "Совпадающих статей: { $count }"
+  },
+  "filter_preview_limit": {
+    "en": "showing the newest { $count }",
+    "de": "die neuesten { $count } werden angezeigt",
+    "fr": "les { $count } plus récents sont affichés",
+    "es": "se muestran los { $count } más recientes",
+    "ja": "新しい { $count } 件を表示",
+    "pt": "exibindo os { $count } mais recentes",
+    "zh": "显示最新的 { $count } 篇",
+    "ru": "показаны последние { $count }"
+  },
+  "filter_no_matches": {
+    "en": "No articles match.",
+    "de": "Keine passenden Artikel.",
+    "fr": "Aucun article ne correspond.",
+    "es": "Ningún artículo coincide.",
+    "ja": "一致する記事はありません。",
+    "pt": "Nenhum artigo corresponde.",
+    "zh": "没有匹配的文章。",
+    "ru": "Нет совпадающих статей."
+  },
+  "filter_starred_visible": {
+    "en": "Starred articles stay visible",
+    "de": "Markierte Artikel bleiben sichtbar",
+    "fr": "Les favoris restent visibles",
+    "es": "Los destacados siguen visibles",
+    "ja": "スター付きの記事は表示されたままです",
+    "pt": "Favoritos continuam visíveis",
+    "zh": "星标文章仍会显示",
+    "ru": "Избранные статьи остаются видимыми"
+  },
+  "filter_empty_title": {
+    "en": "Hide what you don't want to read",
+    "de": "Blende aus, was du nicht lesen willst",
+    "fr": "Masquez ce que vous ne voulez pas lire",
+    "es": "Oculta lo que no quieres leer",
+    "ja": "読みたくない記事を非表示に",
+    "pt": "Oculte o que você não quer ler",
+    "zh": "隐藏你不想读的内容",
+    "ru": "Скройте то, что не хотите читать"
+  },
+  "filter_empty_text": {
+    "en": "Filters hide articles whose title or content matches a regular expression. Hidden articles don't count as unread and come back as they were when a filter is paused or deleted.",
+    "de": "Filter blenden Artikel aus, deren Titel oder Inhalt auf einen regulären Ausdruck passt. Ausgeblendete Artikel zählen nicht als ungelesen und kommen unverändert zurück, wenn ein Filter pausiert oder gelöscht wird.",
+    "fr": "Les filtres masquent les articles dont le titre ou le contenu correspond à une expression régulière. Les articles masqués ne comptent pas comme non lus et réapparaissent tels quels quand un filtre est mis en pause ou supprimé.",
+    "es": "Los filtros ocultan los artículos cuyo título o contenido coincide con una expresión regular. Los artículos ocultos no cuentan como no leídos y vuelven tal como estaban al pausar o eliminar un filtro.",
+    "ja": "フィルターは、タイトルや本文が正規表現に一致する記事を非表示にします。非表示の記事は未読に数えられず、フィルターを一時停止または削除すると元の状態で戻ります。",
+    "pt": "Os filtros ocultam artigos cujo título ou conteúdo corresponde a uma expressão regular. Artigos ocultos não contam como não lidos e voltam como estavam quando um filtro é pausado ou excluído.",
+    "zh": "过滤器会隐藏标题或正文匹配正则表达式的文章。被隐藏的文章不计入未读，暂停或删除过滤器后会原样恢复。",
+    "ru": "Фильтры скрывают статьи, заголовок или текст которых совпадает с регулярным выражением. Скрытые статьи не считаются непрочитанными и возвращаются в прежнем виде, если фильтр приостановлен или удалён."
+  },
+  "filter_examples": {
+    "en": "Start with an example:",
+    "de": "Beginne mit einem Beispiel:",
+    "fr": "Commencez par un exemple :",
+    "es": "Empieza con un ejemplo:",
+    "ja": "例から始める:",
+    "pt": "Comece com um exemplo:",
+    "zh": "从示例开始：",
+    "ru": "Начните с примера:"
+  },
+  "filter_syntax_hint": {
+    "en": "Regular expression (RE2 syntax), e.g. sponsored|giveaway or ^\\[ad\\]",
+    "de": "Regulärer Ausdruck (RE2-Syntax), z. B. sponsored|giveaway oder ^\\[ad\\]",
+    "fr": "Expression régulière (syntaxe RE2), p. ex. sponsored|giveaway ou ^\\[ad\\]",
+    "es": "Expresión regular (sintaxis RE2), p. ej. sponsored|giveaway o ^\\[ad\\]",
+    "ja": "正規表現（RE2 構文）。例: sponsored|giveaway や ^\\[ad\\]",
+    "pt": "Expressão regular (sintaxe RE2), ex. sponsored|giveaway ou ^\\[ad\\]",
+    "zh": "正则表达式（RE2 语法），例如 sponsored|giveaway 或 ^\\[ad\\]",
+    "ru": "Регулярное выражение (синтаксис RE2), напр. sponsored|giveaway или ^\\[ad\\]"
+  },
+  "save": {
+    "en": "Save",
+    "de": "Speichern",
+    "fr": "Enregistrer",
+    "es": "Guardar",
+    "ja": "保存",
+    "pt": "Salvar",
+    "zh": "保存",
+    "ru": "Сохранить"
+  },
+  "revert": {
+    "en": "Revert",
+    "de": "Zurücksetzen",
+    "fr": "Rétablir",
+    "es": "Revertir",
+    "ja": "元に戻す",
+    "pt": "Reverter",
+    "zh": "还原",
+    "ru": "Отменить"
+  },
+  "close": {
+    "en": "Close",
+    "de": "Schließen",
+    "fr": "Fermer",
+    "es": "Cerrar",
+    "ja": "閉じる",
+    "pt": "Fechar",
+    "zh": "关闭",
+    "ru": "Закрыть"
+  },
+  "fail_save_filter": {
+    "en": "Failed to save filter",
+    "de": "Filter konnte nicht gespeichert werden",
+    "fr": "Impossible d'enregistrer le filtre",
+    "es": "No se pudo guardar el filtro",
+    "ja": "フィルターを保存できませんでした",
+    "pt": "Falha ao salvar o filtro",
+    "zh": "保存过滤器失败",
+    "ru": "Не удалось сохранить фильтр"
+  },
   "kb_show_filters": {
     "en": "show unread / starred / all feeds",
     "de": "ungelesene / markierte / alle Feeds anzeigen",

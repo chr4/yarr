@@ -15,6 +15,7 @@ import (
 	"github.com/nkanaev/yarr/src/content/readability"
 	"github.com/nkanaev/yarr/src/content/sanitizer"
 	"github.com/nkanaev/yarr/src/content/silo"
+	"github.com/nkanaev/yarr/src/filter"
 	"github.com/nkanaev/yarr/src/parser/opml"
 	"github.com/nkanaev/yarr/src/server/middleware"
 	"github.com/nkanaev/yarr/src/storage/model"
@@ -62,6 +63,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/feeds/{id}", secure(s.handleFeed))
 	mux.HandleFunc("/api/items", secure(s.handleItemList))
 	mux.HandleFunc("/api/items/{id}", secure(s.handleItem))
+	mux.HandleFunc("/api/filters", secure(s.handleFilterList))
+	mux.HandleFunc("/api/filters/preview", secure(s.handleFilterPreview))
+	mux.HandleFunc("/api/filters/{id}", secure(s.handleFilter))
 	mux.HandleFunc("/api/settings", secure(s.handleSettings))
 	mux.HandleFunc("/opml/import", secure(s.handleOPMLImport))
 	mux.HandleFunc("/opml/export", secure(s.handleOPMLExport))
@@ -234,6 +238,7 @@ func (s *Server) handleFeedList(w http.ResponseWriter, r *http.Request) {
 			})
 			items := worker.ConvertItems(result.Feed.Items, *feed)
 			if len(items) > 0 {
+				filter.ApplyStored(s.db(r), items)
 				s.db(r).CreateItems(items)
 			}
 			// TODO: DiscoverFeed must search for favicon too
@@ -566,4 +571,108 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		s.Auth.Logout(w)
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+const filterPreviewLimit = 50
+
+func decodeFilterParams(w http.ResponseWriter, r *http.Request) (model.FilterParams, bool) {
+	var params model.FilterParams
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		log.Print(err)
+		w.WriteHeader(http.StatusBadRequest)
+		return params, false
+	}
+	if _, err := filter.Compile(params.Pattern, params.CaseSensitive); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return params, false
+	}
+	return params, true
+}
+
+// refilter applies changed filters to the stored items and returns the
+// filter with the given id, as stored.
+func (s *Server) refilter(r *http.Request, id int64) *model.Filter {
+	if err := filter.Refilter(s.db(r)); err != nil {
+		log.Print(err)
+	}
+	for _, f := range s.db(r).ListFilters() {
+		if f.Id == id {
+			return &f
+		}
+	}
+	return nil
+}
+
+func (s *Server) handleFilterList(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.db(r).ListFilters())
+	case http.MethodPost:
+		params, ok := decodeFilterParams(w, r)
+		if !ok {
+			return
+		}
+		created := s.db(r).CreateFilter(params)
+		if created == nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusCreated, s.refilter(r, created.Id))
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleFilter(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	switch r.Method {
+	case http.MethodPut:
+		params, ok := decodeFilterParams(w, r)
+		if !ok {
+			return
+		}
+		if !s.db(r).UpdateFilter(id, params) {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		updated := s.refilter(r, id)
+		if updated == nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		writeJSON(w, http.StatusOK, updated)
+	case http.MethodDelete:
+		if !s.db(r).DeleteFilter(id) {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		s.refilter(r, id)
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleFilterPreview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var params model.FilterParams
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		log.Print(err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	// an invalid pattern is expected while typing, so it is not a failed request
+	count, matches, err := filter.Preview(s.db(r), params, filterPreviewLimit)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"error": err.Error(), "count": 0, "list": []any{}})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"count": count, "list": matches})
 }

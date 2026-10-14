@@ -148,3 +148,34 @@ export interface SettingsUpdateData {
   refresh_rate?: number;
   language?: string;
 }
+
+export interface FilterParams {
+  pattern: string;
+  match_content: boolean;
+  case_sensitive: boolean;
+  feed_id: number | null;
+  enabled: boolean;
+}
+
+export interface Filter extends FilterParams {
+  id: number;
+  hidden: number;
+}
+
+export interface FilterPreviewMatch {
+  id: number;
+  feed_id: number;
+  title: string;
+  date: string;
+  status: ItemStatus;
+  field: "title" | "content";
+  before: string;
+  match: string;
+  after: string;
+}
+
+export interface FilterPreviewResponse {
+  error?: string;
+  count: number;
+  list: FilterPreviewMatch[];
+}
