@@ -39,10 +39,14 @@ type FeedIngestor interface {
 // PageFetcher fetches the article pages of the items checked by filters.
 type PageFetcher interface {
 	// FetchMissingPages fetches, in the background, the pages missing among
-	// the newest items of a feed. It reports whether there was anything to fetch.
+	// the newest items of a feed. It reports whether the pages are being fetched.
 	FetchMissingPages(store storage.Storage, feedId int64) bool
-	// MissingPages reports how many of the newest items of a feed have no page.
-	MissingPages(store storage.Storage, feedId int64) int
+	// RefetchPages fetches the pages of the newest items of a feed again, in
+	// the background. It reports false if the pages are being fetched already.
+	RefetchPages(store storage.Storage, feedId int64) bool
+	// PagesLeft reports how many pages of a feed are left to fetch, and
+	// whether they are being fetched.
+	PagesLeft(feedId int64) (left int, fetching bool)
 }
 
 type Server struct {

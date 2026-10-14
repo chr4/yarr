@@ -147,9 +147,9 @@ func (s *PostgresStorage) ListItemGUIDs(feedId int64) map[string]bool {
 	return result
 }
 
-// ListItemsWithoutPage returns the items among the newest of a feed whose
-// article page has not been fetched yet.
-func (s *PostgresStorage) ListItemsWithoutPage(feedId int64, limit int) []model.Item {
+// ListPageItems returns the newest items of a feed, for fetching their
+// article pages: all of them, or only those without page yet.
+func (s *PostgresStorage) ListPageItems(feedId int64, limit int, onlyMissing bool) []model.Item {
 	result := make([]model.Item, 0)
 	rows, err := s.db.Query(`
 		select i.id, i.feed_id, i.link
@@ -160,9 +160,9 @@ func (s *PostgresStorage) ListItemsWithoutPage(feedId int64, limit int) []model.
 			order by date desc, id desc
 			limit $2
 		) i
-		where not exists (select 1 from item_pages p where p.item_id = i.id)
+		where not $3 or not exists (select 1 from item_pages p where p.item_id = i.id)
 		order by i.date desc, i.id desc
-	`, feedId, limit)
+	`, feedId, limit, onlyMissing)
 	if err != nil {
 		log.Print(err)
 		return result
