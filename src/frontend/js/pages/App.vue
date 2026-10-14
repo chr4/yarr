@@ -524,7 +524,11 @@
       :language="language"
       :draft="filterDraft"
       @changed="onFiltersChanged"
-      @close="showFilters = false" />
+      @close="showFilters = false">
+      <template #list-handle>
+        <v-drag :width="itemListWidth" @resize="resizeItemList"></v-drag>
+      </template>
+    </v-filters>
     <v-modal :open="showModal !== ''" @hide="showModal = ''">
       <button
         class="c-button-link outline-none position-absolute top-0 end-0 p-2 m-2"
