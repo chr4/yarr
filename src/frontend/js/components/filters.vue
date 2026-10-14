@@ -51,6 +51,12 @@
             <span class="flex-shrink-0">·</span>
             <span class="flex-shrink-0">{{ fieldLabel(f) }}</span>
             <span class="flex-grow-1"></span>
+            <span
+              class="flex-shrink-0 d-flex align-items-center gap-1"
+              :title="$t('filter_pages_blocked', { count: f.blocked })"
+              v-if="f.blocked">
+              <v-icon name="alert-circle" />{{ f.blocked }}
+            </span>
             <span class="flex-shrink-0" v-if="!f.enabled">{{ $t("filter_paused") }}</span>
             <span
               class="flex-shrink-0 d-flex align-items-center gap-1"
@@ -220,6 +226,13 @@
             v-if="preview.pages?.fetching && !preview.error">
             <span class="c-spinner"></span>
             {{ $t("filter_pages_fetching", { count: preview.pages.left }) }}
+          </div>
+          <div
+            class="filter-blocked d-flex align-items-start gap-2 small mb-2 px-2 py-1"
+            role="status"
+            v-if="preview.pages?.blocked && !preview.error">
+            <v-icon name="alert-circle" class="flex-shrink-0 mt-1" />
+            <span>{{ $t("filter_pages_blocked_notice", { count: preview.pages.blocked }) }}</span>
           </div>
           <p
             class="opacity-75"

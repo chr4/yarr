@@ -667,7 +667,11 @@ func (s *Server) handleFilterPreview(w http.ResponseWriter, r *http.Request) {
 		// matches grow while the pages are fetched, so the preview is asked again until done
 		s.Pages.FetchMissingPages(s.db(r), *params.FeedId)
 		left, fetching := s.Pages.PagesLeft(*params.FeedId)
-		result["pages"] = map[string]any{"fetching": fetching, "left": left}
+		result["pages"] = map[string]any{
+			"fetching": fetching,
+			"left":     left,
+			"blocked":  s.db(r).CountBlockedPages(*params.FeedId),
+		}
 	}
 	writeJSON(w, http.StatusOK, result)
 }
