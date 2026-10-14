@@ -547,6 +547,8 @@ import type {
 var app = window.app;
 
 const STATS_POLL_INTERVAL = 30 * 1000;
+// pages fetched to connect new items to the loaded list before giving up and reloading it
+const MERGE_MAX_PAGES = 5;
 
 function sameFeedStats(a: Record<number, FeedStat>, b: Record<number, FeedStat>): boolean {
   const ids = Object.keys(b);
@@ -1082,33 +1084,56 @@ export default defineComponent({
       if (!this.items.length) return this.refreshItems(false);
 
       const query = this.getItemsQuery();
-      const [err, data] = await to(api.items.list(query));
-      if (err || this.loading.items) return;
-      if (JSON.stringify(query) !== JSON.stringify(this.getItemsQuery())) return;
+      let list: Item[] = [];
+      let hasMore = false;
+      // fetch pages until one reaches the loaded items, so that no gap is left between them
+      for (let page = 1; ; page++) {
+        const pageQuery = list.length ? { ...query, after: list[list.length - 1].id } : query;
+        const [err, data] = await to(api.items.list(pageQuery));
+        if (err || this.loading.items) return;
+        if (JSON.stringify(query) !== JSON.stringify(this.getItemsQuery())) return;
 
+        list = list.concat(data.list);
+        hasMore = data.has_more;
+        const known = new Set(this.items.map(i => i.id));
+        if (!hasMore || data.list.some(i => known.has(i.id))) break;
+        if (page === MERGE_MAX_PAGES) {
+          // too many new items to connect, start over at the top
+          if (this.$refs.itemlist) this.$refs.itemlist.scrollTop = 0;
+          return this.refreshItems(false);
+        }
+      }
+
+      // the list might have changed while fetching
       const known = new Set(this.items.map(i => i.id));
-      const fresh = data.list.filter(i => !known.has(i.id));
-      // the whole first page is new, there may be a gap to the loaded items
-      if (data.has_more && fresh.length === data.list.length) return this.refreshItems(false);
+      const fresh = list.filter(i => !known.has(i.id));
 
       // items sorted after the last loaded one arrive with the next page
       const last = this.items[this.items.length - 1];
       const added = this.itemsHasMore ? fresh.filter(i => this.compareItems(i, last) < 0) : fresh;
       if (added.length) {
-        // keep the topmost visible entry in place when items are added above it
+        // keep the topmost visible entry in place when items are added above it.
+        // compare its position on screen rather than in the list: browsers with scroll anchoring
+        // already compensate for the insertion, which must not be done twice
         const el = this.$refs.itemlist;
+        const viewTop = el.getBoundingClientRect().top + el.clientTop;
         const anchor = Array.from(el.children as HTMLCollectionOf<HTMLElement>).find(
-          c => c.offsetTop + c.offsetHeight > el.scrollTop,
+          c => c.getBoundingClientRect().bottom > viewTop,
         );
-        const anchorTop = anchor?.offsetTop ?? 0;
+        const anchorTop = anchor?.getBoundingClientRect().top ?? 0;
+        const atTop = el.scrollTop === 0;
         this.items = this.items.concat(added).sort(this.compareItems);
         this.$nextTick(() => {
-          if (anchor && el.scrollTop > 0) el.scrollTop += anchor.offsetTop - anchorTop;
+          // show items added to the top of the list when it was not scrolled
+          if (atTop) el.scrollTop = 0;
+          else if (anchor?.isConnected) {
+            el.scrollTop += anchor.getBoundingClientRect().top - anchorTop;
+          }
         });
       }
 
-      // new items beyond the first page of a fully loaded list
-      if (!this.itemsHasMore && data.has_more) {
+      // new items beyond the fetched pages of a fully loaded list
+      if (!this.itemsHasMore && hasMore) {
         this.itemsHasMore = true;
         this.refreshItems(true);
       }
