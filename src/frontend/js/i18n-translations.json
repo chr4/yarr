@@ -589,6 +589,26 @@
     "zh": "标题或文章页面",
     "ru": "заголовок или страница статьи"
   },
+  "filter_field_link": {
+    "en": "link",
+    "de": "Link",
+    "fr": "lien",
+    "es": "enlace",
+    "ja": "リンク",
+    "pt": "link",
+    "zh": "链接",
+    "ru": "ссылка"
+  },
+  "filter_link_hint": {
+    "en": "Only the article's link (URL) is matched, not the title. Paid articles often have their own path, e.g. /plus/",
+    "de": "Nur der Link (URL) des Artikels wird geprüft, nicht der Titel. Bezahlartikel haben oft einen eigenen Pfad, z. B. /plus/",
+    "fr": "Seul le lien (URL) de l'article est vérifié, pas le titre. Les articles payants ont souvent leur propre chemin, p. ex. /plus/",
+    "es": "Solo se comprueba el enlace (URL) del artículo, no el título. Los artículos de pago suelen tener su propia ruta, p. ej. /plus/",
+    "ja": "タイトルではなく記事のリンク（URL）だけを照合します。有料記事は専用のパスを持つことが多いです。例: /plus/",
+    "pt": "Só o link (URL) do artigo é verificado, não o título. Artigos pagos costumam ter um caminho próprio, ex. /plus/",
+    "zh": "只匹配文章的链接（URL），不匹配标题。付费文章通常有自己的路径，例如 /plus/",
+    "ru": "Проверяется только ссылка (URL) статьи, не заголовок. У платных статей часто свой путь, напр. /plus/"
+  },
   "filter_page_hint": {
     "en": "The article page is fetched and searched in its source, without scripts and styles. Paywalls often show in structured data, e.g. \"isAccessibleForFree\":\\s*false",
     "de": "Die Artikelseite wird abgerufen und in ihrem Quelltext durchsucht, ohne Skripte und Styles. Paywalls zeigen sich oft in strukturierten Daten, z. B. \"isAccessibleForFree\":\\s*false",
