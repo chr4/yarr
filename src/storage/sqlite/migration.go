@@ -24,6 +24,7 @@ var migrations = []func(*sql.Tx) error{
 	m14_upgrade_fts5,
 	m15_update_item_update_trigger,
 	m16_add_item_filters,
+	m17_add_item_pages,
 }
 
 var maxVersion = int64(len(migrations))
@@ -447,6 +448,18 @@ func m16_add_item_filters(tx *sql.Tx) error {
 
 		alter table items add column filter_id integer references filters(id) on delete set null;
 		create index idx_item_filter_id on items(filter_id) where filter_id is not null;
+	`)
+	return err
+}
+
+func m17_add_item_pages(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+		alter table filters add column match_page boolean not null default false;
+
+		create table item_pages (
+		 item_id integer primary key references items(id) on delete cascade,
+		 content text not null
+		);
 	`)
 	return err
 }

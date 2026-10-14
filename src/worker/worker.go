@@ -143,6 +143,7 @@ func (w *Worker) worker(srcqueue <-chan model.Feed, dstqueue chan<- []model.Item
 		if len(items) > 0 && feed.Icon == nil {
 			w.FindFeedFavicon(feed)
 		}
+		w.fetchNewPages(w.db, feed, items)
 		dstqueue <- items
 	}
 }

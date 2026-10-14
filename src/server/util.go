@@ -6,7 +6,8 @@ import (
 	"strings"
 )
 
-func isInternalFromURL(urlStr string) bool {
+// IsInternalURL reports whether a URL points at this machine or the local network.
+func IsInternalURL(urlStr string) bool {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return false

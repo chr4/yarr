@@ -117,3 +117,71 @@ func TestFilteredItems(t *testing.T) {
 		}
 	})
 }
+
+func TestItemPages(t *testing.T) {
+	dbtest(t, func(t *testing.T, db storage.Storage) {
+		feed := db.CreateFeed(model.CreateFeedParams{Title: "feed", FeedLink: "http://example.com/feed.xml"})
+		paywalled := `<script type="application/ld+json">{"isAccessibleForFree": false}</script>`
+		db.CreateItems([]model.Item{
+			{GUID: "paywalled", FeedId: feed.Id, Title: "one", Link: "http://example.com/1", Page: &paywalled, Date: time.Now().Add(-2 * time.Hour)},
+			{GUID: "free", FeedId: feed.Id, Title: "two", Link: "http://example.com/2", Date: time.Now().Add(-time.Hour)},
+			{GUID: "newest", FeedId: feed.Id, Title: "three", Link: "http://example.com/3", Date: time.Now()},
+		})
+
+		if have := db.ListItemGUIDs(feed.Id); len(have) != 3 || !have["free"] {
+			t.Fatalf("invalid guids: %v", have)
+		}
+
+		// only the newest items are looked at
+		missing := db.ListItemsWithoutPage(feed.Id, 2)
+		if len(missing) != 2 || missing[0].Link != "http://example.com/3" || missing[1].Link != "http://example.com/2" {
+			t.Fatalf("expected the two newest items without page, got %+v", missing)
+		}
+		if missing := db.ListItemsWithoutPage(feed.Id, 1); len(missing) != 1 {
+			t.Fatalf("expected one item without page, got %+v", missing)
+		}
+
+		// arriving again leaves the stored page alone
+		db.CreateItems([]model.Item{{GUID: "paywalled", FeedId: feed.Id, Title: "one", Date: time.Now()}})
+
+		if !db.SetItemPages(map[int64]string{missing[0].Id: "<p>free</p>", missing[1].Id: ""}) {
+			t.Fatal("failed to store pages")
+		}
+		if missing := db.ListItemsWithoutPage(feed.Id, 10); len(missing) != 0 {
+			t.Fatalf("expected no missing pages, got %+v", missing)
+		}
+
+		pages := make(map[string]*string)
+		db.ForEachItem(false, true, func(item model.Item) { pages[item.Title] = item.Page })
+		if pages["one"] == nil || *pages["one"] != paywalled || pages["two"] == nil || *pages["two"] != "" {
+			t.Fatalf("invalid pages: %v", pages)
+		}
+		db.ForEachItem(false, false, func(item model.Item) {
+			if item.Page != nil {
+				t.Fatalf("expected no page without asking, got %q", *item.Page)
+			}
+		})
+
+		f := db.CreateFilter(model.FilterParams{
+			Pattern: `"isAccessibleForFree":\s*false`, MatchPage: true, FeedId: &feed.Id, Enabled: true,
+		})
+		if !db.ListFilters()[0].MatchPage {
+			t.Fatal("expected the filter to check the page")
+		}
+		if err := filter.Refilter(db); err != nil {
+			t.Fatal(err)
+		}
+		if have := listedGUIDs(db, model.ItemFilter{}); !slices.Equal(have, []string{"free", "newest"}) {
+			t.Fatalf("expected the paywalled item to be hidden, got %v", have)
+		}
+
+		// pages go away with their items
+		db.DeleteFilter(f.Id)
+		db.DeleteFeed(feed.Id)
+		count := 0
+		db.ForEachItem(false, true, func(model.Item) { count++ })
+		if count != 0 {
+			t.Fatalf("expected no items left, got %d", count)
+		}
+	})
+}
