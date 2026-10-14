@@ -20,7 +20,7 @@ type Storage interface {
 	DeleteFolder(folderId int64) bool
 	DeleteOldItems()
 	FeedStats() []model.FeedStat
-	ForEachItem(withContent bool, fn func(item model.Item)) error
+	ForEachItem(withContent, withPage bool, fn func(item model.Item)) error
 	GetFeed(id int64) *model.Feed
 	GetFeedState(feedID int64) (*model.FeedState, error)
 	GetItem(id int64) *model.Item
@@ -29,9 +29,12 @@ type Storage interface {
 	ListFeeds() []model.Feed
 	ListFilters() []model.Filter
 	ListFolders() []model.Folder
+	ListItemGUIDs(feedId int64) map[string]bool
 	ListItems(filter model.ItemFilter, limit int, newestFirst bool, withContent bool) []model.Item
+	ListItemsWithoutPage(feedId int64, limit int) []model.Item
 	MarkItemsRead(filter model.MarkFilter) bool
 	SetItemFilters(filterIds map[int64]*int64) bool
+	SetItemPages(pages map[int64]string) bool
 	UpdateFeed(feedId int64, params model.UpdateFeedParams) (bool, error)
 	UpdateFeedState(feedID int64, params model.UpdateFeedStateParams) (bool, error)
 	UpdateFilter(id int64, params model.FilterParams) bool

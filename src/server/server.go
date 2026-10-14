@@ -36,6 +36,15 @@ type FeedIngestor interface {
 	AddOPML(ctx context.Context, store storage.Storage, file io.Reader) error
 }
 
+// PageFetcher fetches the article pages of the items checked by filters.
+type PageFetcher interface {
+	// FetchMissingPages fetches, in the background, the pages missing among
+	// the newest items of a feed. It reports whether there was anything to fetch.
+	FetchMissingPages(store storage.Storage, feedId int64) bool
+	// MissingPages reports how many of the newest items of a feed have no page.
+	MissingPages(store storage.Storage, feedId int64) int
+}
+
 type Server struct {
 	Addr     string
 	BasePath string
@@ -44,6 +53,7 @@ type Server struct {
 	Scheduler FeedScheduler
 	Auth      AuthProvider
 	Ingestor  FeedIngestor
+	Pages     PageFetcher
 
 	StaticFS fs.FS
 	Template *template.Template
