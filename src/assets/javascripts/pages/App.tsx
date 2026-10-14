@@ -1081,6 +1081,7 @@ export default function App() {
           draft={filterDraft.value}
           onChanged={onFiltersChanged}
           onClose={() => (showFilters.value = false)}
+          listHandle={<Drag width={settings.values.item_list_width.value} onResize={resizeItemList} />}
         />
       )}
 
