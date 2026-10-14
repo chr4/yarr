@@ -140,3 +140,27 @@ func TestPreviewPage(t *testing.T) {
 		t.Fatalf("expected the page to match, got %d: %+v", count, list)
 	}
 }
+
+func TestMatchLink(t *testing.T) {
+	if err := Check(model.FilterParams{Pattern: "/plus/", MatchLink: true, MatchContent: true}); err != ErrLinkAlone {
+		t.Errorf("expected matching the link and content to be rejected, got %v", err)
+	}
+	m := New([]model.Filter{{Id: 1, Pattern: "/plus/", MatchLink: true, Enabled: true}})
+	if m.NeedsContent() || len(m.PageFeeds()) != 0 {
+		t.Error("expected a link filter to need neither content nor pages")
+	}
+
+	tests := []struct {
+		item model.Item
+		want bool
+	}{
+		{model.Item{FeedId: 1, Title: "news", Link: "https://example.com/plus/article"}, true},
+		{model.Item{FeedId: 2, Title: "news", Link: "https://example.com/PLUS/article"}, true},
+		{model.Item{FeedId: 1, Title: "the /plus/ offer", Link: "https://example.com/article"}, false},
+	}
+	for _, tt := range tests {
+		if have := m.Match(tt.item); (have != nil) != tt.want {
+			t.Errorf("%+v: expected match %v, got %v", tt.item, tt.want, have)
+		}
+	}
+}

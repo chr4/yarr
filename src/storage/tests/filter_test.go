@@ -197,3 +197,24 @@ func TestItemPages(t *testing.T) {
 		}
 	})
 }
+
+func TestLinkFilter(t *testing.T) {
+	dbtest(t, func(t *testing.T, db storage.Storage) {
+		feed := db.CreateFeed(model.CreateFeedParams{Title: "feed", FeedLink: "http://example.com/feed.xml"})
+		db.CreateItems([]model.Item{
+			{GUID: "paid", FeedId: feed.Id, Title: "one", Link: "https://example.com/plus/1", Date: time.Now()},
+			{GUID: "free", FeedId: feed.Id, Title: "plus two", Link: "https://example.com/2", Date: time.Now()},
+		})
+
+		db.CreateFilter(model.FilterParams{Pattern: "/plus/", MatchLink: true, Enabled: true})
+		if have := db.ListFilters(); len(have) != 1 || !have[0].MatchLink {
+			t.Fatalf("expected a link filter, got %+v", have)
+		}
+		if err := filter.Refilter(db); err != nil {
+			t.Fatal(err)
+		}
+		if have := listedGUIDs(db, model.ItemFilter{}); !slices.Equal(have, []string{"free"}) {
+			t.Fatalf("expected only the item with the matching link to be hidden, got %v", have)
+		}
+	})
+}

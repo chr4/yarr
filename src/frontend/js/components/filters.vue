@@ -131,6 +131,12 @@
                 @click="setField('page')">
                 {{ $t("filter_field_page") }}
               </button>
+              <button
+                type="button"
+                :aria-pressed="fieldOf(form) === 'link'"
+                @click="setField('link')">
+                {{ $t("filter_field_link") }}
+              </button>
             </div>
             <span>{{ $t("filter_matches") }}</span>
           </div>
@@ -165,7 +171,7 @@
 
           <div
             class="d-flex flex-wrap align-items-center gap-2"
-            :class="form.match_page ? 'mb-1' : 'mb-3'">
+            :class="form.match_page || form.match_link ? 'mb-1' : 'mb-3'">
             <label for="filter-scope">{{ $t("filter_in") }}</label>
             <select
               id="filter-scope"
@@ -178,9 +184,10 @@
               </optgroup>
             </select>
           </div>
-          <div class="small mb-3" v-if="form.match_page">
+          <div class="small mb-3" v-if="form.match_page || form.match_link">
             <span class="text-danger" v-if="pageNeedsFeed">{{ $t("filter_page_needs_feed") }}</span>
-            <span class="opacity-75" v-else>{{ $t("filter_page_hint") }}</span>
+            <span class="opacity-75" v-else-if="form.match_page">{{ $t("filter_page_hint") }}</span>
+            <span class="opacity-75" v-else>{{ $t("filter_link_hint") }}</span>
           </div>
 
           <div class="d-flex flex-wrap align-items-center gap-2">
@@ -296,13 +303,14 @@ const PREVIEW_DELAY = 300;
 // asking again for the preview while article pages are fetched
 const PAGES_POLL_DELAY = 2000;
 
-type Field = "title" | "content" | "page";
+type Field = "title" | "content" | "page" | "link";
 
 function emptyForm(): FilterParams {
   return {
     pattern: "",
     match_content: false,
     match_page: false,
+    match_link: false,
     case_sensitive: false,
     feed_id: null,
     enabled: true,
@@ -314,6 +322,7 @@ function sameForm(a: FilterParams, b: FilterParams): boolean {
     a.pattern === b.pattern &&
     a.match_content === b.match_content &&
     a.match_page === b.match_page &&
+    a.match_link === b.match_link &&
     a.case_sensitive === b.case_sensitive &&
     a.feed_id === b.feed_id &&
     a.enabled === b.enabled
@@ -368,8 +377,9 @@ export default defineComponent({
       if (this.selected === "new") return emptyForm();
       const f = this.filters.find(f => f.id === this.selected);
       if (!f) return null;
-      const { pattern, match_content, match_page, case_sensitive, feed_id, enabled } = f;
-      return { pattern, match_content, match_page, case_sensitive, feed_id, enabled };
+      const { pattern, match_content, match_page, match_link, case_sensitive, feed_id, enabled } =
+        f;
+      return { pattern, match_content, match_page, match_link, case_sensitive, feed_id, enabled };
     },
     dirty(): boolean {
       return !!this.original && !sameForm(this.form, this.original);
@@ -448,18 +458,21 @@ export default defineComponent({
         this.$emit("changed");
       }
     },
-    fieldOf(f: Pick<FilterParams, "match_content" | "match_page">): Field {
+    fieldOf(f: Pick<FilterParams, "match_content" | "match_page" | "match_link">): Field {
       if (f.match_page) return "page";
+      if (f.match_link) return "link";
       return f.match_content ? "content" : "title";
     },
-    fieldLabel(f: Pick<FilterParams, "match_content" | "match_page">): string {
+    fieldLabel(f: Pick<FilterParams, "match_content" | "match_page" | "match_link">): string {
       const field = this.fieldOf(f);
       if (field === "page") return this.$t("filter_field_page");
+      if (field === "link") return this.$t("filter_field_link");
       return field === "content" ? this.$t("filter_field_content") : this.$t("filter_field_title");
     },
     setField(field: Field) {
       this.form.match_content = field === "content";
       this.form.match_page = field === "page";
+      this.form.match_link = field === "link";
     },
     regexLiteral(f: Pick<FilterParams, "pattern" | "case_sensitive">): string {
       return "/" + f.pattern + "/" + (f.case_sensitive ? "" : "i");
