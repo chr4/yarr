@@ -2,11 +2,14 @@
   <div
     id="col-filters"
     class="vh-100 d-flex flex-grow-1"
+    style="min-width: 0"
     :class="{ 'is-editing': selected !== null }">
     <!-- filter list -->
     <div
-      class="filters-list d-flex flex-column border-end flex-shrink-0"
+      class="filters-list position-relative d-flex flex-column border-end flex-shrink-0"
       :style="{ width: listWidth + 'px' }">
+      <!-- resize handle, shared with the item list -->
+      <slot name="list-handle"></slot>
       <div class="px-2 py-1 d-flex gap-1 align-items-center">
         <button class="c-button-pill d-lg-none" @click="$emit('close')" :title="$t('show_feeds')">
           <v-icon name="chevron-left" />
@@ -16,8 +19,9 @@
         </div>
         <span
           class="flex-shrink-0 d-flex align-items-center gap-1 px-1 small opacity-75 user-select-none"
+          :title="$t('filters_hidden', { count: totalHidden })"
           v-if="totalHidden">
-          <v-icon name="eye-off" />{{ $t("filters_hidden", { count: totalHidden }) }}
+          <v-icon name="eye-off" />{{ totalHidden }}
         </span>
         <button
           class="c-button-pill"
