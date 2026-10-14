@@ -380,10 +380,19 @@
           </button>
         </v-dropdown>
       </div>
+      <!-- new items that would be added above the visible ones. no height, so the list does not move -->
+      <div class="position-relative" v-if="itemsPending.length">
+        <button
+          class="c-button-pill c-pending-items position-absolute start-50 translate-middle-x mt-2 gap-1 align-items-center"
+          @click="showPendingItems">
+          <v-icon name="chevron-up" />
+          {{ $t("new_articles", { count: itemsPending.length + (itemsPendingGap ? "+" : "") }) }}
+        </button>
+      </div>
       <div
         id="item-list-scroll"
         class="d-flex flex-column p-2 overflow-auto border-top flex-grow-1 gap-1"
-        v-scroll="loadMoreItems"
+        v-scroll="onItemListScroll"
         ref="itemlist">
         <a
           v-for="item in items"
@@ -770,6 +779,10 @@ export default defineComponent({
       UI_SIZE_MAX,
       items: [] as Item[],
       itemsHasMore: true,
+      // new items held back, because they would be added above the visible ones
+      itemsPending: [] as Item[],
+      // the new items might not connect to the loaded ones, the list has to be reloaded
+      itemsPendingGap: false,
       itemSelected: null as number | null,
       itemSelectedDetails: null as Item | null,
       itemSelectedReadability: "",
@@ -1198,6 +1211,10 @@ export default defineComponent({
       this.feeds = values[1];
     },
     async refreshItems(loadMore = false) {
+      if (!loadMore) {
+        this.itemsPending = [];
+        this.itemsPendingGap = false;
+      }
       if (this.feedSelected === null) {
         this.items = [];
         this.itemsHasMore = false;
@@ -1245,25 +1262,21 @@ export default defineComponent({
       if (err || this.loading.items) return;
       if (JSON.stringify(query) !== JSON.stringify(this.getItemsQuery())) return;
 
-      const known = new Set(this.items.map(i => i.id));
+      const known = new Set(this.items.concat(this.itemsPending).map(i => i.id));
       const fresh = data.list.filter(i => !known.has(i.id));
       // the whole first page is new, there may be a gap to the loaded items
-      if (data.has_more && fresh.length === data.list.length) return this.refreshItems(false);
+      if (data.has_more && fresh.length === data.list.length) {
+        this.itemsPending = this.itemsPending.concat(fresh);
+        this.itemsPendingGap = true;
+        return this.insertPendingItems();
+      }
 
       // items sorted after the last loaded one arrive with the next page
       const last = this.items[this.items.length - 1];
       const added = this.itemsHasMore ? fresh.filter(i => this.compareItems(i, last) < 0) : fresh;
       if (added.length) {
-        // keep the topmost visible entry in place when items are added above it
-        const el = this.$refs.itemlist;
-        const anchor = Array.from(el.children as HTMLCollectionOf<HTMLElement>).find(
-          c => c.offsetTop + c.offsetHeight > el.scrollTop,
-        );
-        const anchorTop = anchor?.offsetTop ?? 0;
-        this.items = this.items.concat(added).sort(this.compareItems);
-        this.$nextTick(() => {
-          if (anchor && el.scrollTop > 0) el.scrollTop += anchor.offsetTop - anchorTop;
-        });
+        this.itemsPending = this.itemsPending.concat(added);
+        this.insertPendingItems();
       }
 
       // new items beyond the first page of a fully loaded list
@@ -1271,6 +1284,52 @@ export default defineComponent({
         this.itemsHasMore = true;
         this.refreshItems(true);
       }
+    },
+    insertPendingItems() {
+      // only add new items where they show up on screen or below it. added further up, they would
+      // be out of sight, and the visible entries could be pushed up out of view
+      if (!this.itemsPending.length || !this.items.length) return;
+      const el = this.$refs.itemlist;
+      const rows = el.querySelectorAll<HTMLElement>(".c-listitem");
+      if (rows.length !== this.items.length) return; // not rendered yet, retried on scroll
+      const viewTop = el.getBoundingClientRect().top + el.clientTop;
+      // nothing loaded is visible anymore, or the list is hidden (responsive design)
+      const all =
+        !el.clientHeight || rows[rows.length - 1].getBoundingClientRect().bottom <= viewTop;
+
+      if (this.itemsPendingGap) {
+        if (all || el.scrollTop === 0) this.refreshItems(false);
+        return;
+      }
+
+      const insert = all
+        ? this.itemsPending
+        : this.itemsPending.filter(item => {
+            const index = this.items.findIndex(i => this.compareItems(item, i) < 0);
+            return index === -1 || rows[index].getBoundingClientRect().top >= viewTop;
+          });
+      if (!insert.length) return;
+      this.itemsPending = this.itemsPending.filter(i => !insert.includes(i));
+      // keep the scroll position, so that the entries below the new items move down. browsers with
+      // scroll anchoring would keep them in place instead and move the new items out of sight
+      const scrollTop = el.scrollTop;
+      this.items = this.items.concat(insert).sort(this.compareItems);
+      this.$nextTick(() => (el.scrollTop = scrollTop));
+    },
+    async showPendingItems() {
+      const el = this.$refs.itemlist;
+      if (this.itemsPendingGap) {
+        el.scrollTop = 0;
+        return this.refreshItems(false);
+      }
+      const first = this.itemsPending.reduce((a, b) => (this.compareItems(a, b) < 0 ? a : b));
+      this.items = this.items.concat(this.itemsPending).sort(this.compareItems);
+      this.itemsPending = [];
+      await this.$nextTick();
+      const row = el.querySelectorAll<HTMLElement>(".c-listitem")[this.items.indexOf(first)];
+      if (!row) return;
+      const offset = row.getBoundingClientRect().top - el.getBoundingClientRect().top;
+      el.scrollTop += offset - el.clientTop - parseFloat(getComputedStyle(el).paddingTop);
     },
     compareItems(a: Item, b: Item): number {
       // same order as the server: by date, then by id
@@ -1290,6 +1349,10 @@ export default defineComponent({
       var closeToBottom =
         el.scrollHeight - el.scrollTop - el.offsetHeight - spacerHeight < bottomSpace * scale;
       return closeToBottom;
+    },
+    onItemListScroll() {
+      this.insertPendingItems();
+      this.loadMoreItems();
     },
     loadMoreItems() {
       if (!this.itemsHasMore) return;
@@ -1313,6 +1376,8 @@ export default defineComponent({
         return;
       }
       this.items = [];
+      this.itemsPending = [];
+      this.itemsPendingGap = false;
       this.itemSelected = null;
       this.itemsHasMore = false;
       this.refreshStats();

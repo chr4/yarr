@@ -459,6 +459,16 @@
     "zh": "无标题",
     "ru": "без названия"
   },
+  "new_articles": {
+    "en": "{ $count } new",
+    "de": "{ $count } neu",
+    "fr": "{ $count } nouveaux",
+    "es": "{ $count } nuevos",
+    "ja": "新着 { $count } 件",
+    "pt": "{ $count } novos",
+    "zh": "{ $count } 条新文章",
+    "ru": "Новых: { $count }"
+  },
   "sans_serif": {
     "en": "sans-serif",
     "de": "serifenlos",
