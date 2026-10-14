@@ -76,6 +76,9 @@ type Item struct {
 	Date       time.Time  `json:"date"`
 	Status     ItemStatus `json:"status"`
 	MediaLinks MediaLinks `json:"media_links"`
+
+	// id of the filter hiding this item, if any
+	FilterId *int64 `json:"-"`
 }
 
 type ItemStatus int

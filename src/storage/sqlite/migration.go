@@ -23,6 +23,7 @@ var migrations = []func(*sql.Tx) error{
 	m13_consolidate_feed_states,
 	m14_upgrade_fts5,
 	m15_update_item_update_trigger,
+	m16_add_item_filters,
 }
 
 var maxVersion = int64(len(migrations))
@@ -429,6 +430,23 @@ func m15_update_item_update_trigger(tx *sql.Tx) error {
 		  insert into search(search, rowid, title, content) values('delete', old.id, old.title, strip_html(old.content));
 		  insert into search(rowid, title, content) values (new.id, new.title, strip_html(new.content));
 		end;
+	`)
+	return err
+}
+
+func m16_add_item_filters(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+		create table filters (
+		 id             integer primary key autoincrement,
+		 pattern        text not null,
+		 match_content  boolean not null default false,
+		 case_sensitive boolean not null default false,
+		 feed_id        integer references feeds(id) on delete cascade,
+		 enabled        boolean not null default true
+		);
+
+		alter table items add column filter_id integer references filters(id) on delete set null;
+		create index idx_item_filter_id on items(filter_id) where filter_id is not null;
 	`)
 	return err
 }

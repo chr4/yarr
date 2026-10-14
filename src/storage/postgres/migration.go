@@ -8,6 +8,7 @@ import (
 
 var migrations = []func(*sql.Tx) error{
 	m01_initial,
+	m02_add_item_filters,
 }
 
 var maxVersion = int64(len(migrations))
@@ -115,6 +116,23 @@ func m01_initial(tx *sql.Tx) error {
 			http_lmod      text not null default '',
 			http_etag      text not null default ''
 		);
+	`)
+	return err
+}
+
+func m02_add_item_filters(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+		create table filters (
+			id             bigserial primary key,
+			pattern        text not null,
+			match_content  boolean not null default false,
+			case_sensitive boolean not null default false,
+			feed_id        bigint references feeds(id) on delete cascade,
+			enabled        boolean not null default true
+		);
+
+		alter table items add column filter_id bigint references filters(id) on delete set null;
+		create index idx_item_filter_id on items(filter_id) where filter_id is not null;
 	`)
 	return err
 }
