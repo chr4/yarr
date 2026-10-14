@@ -9,6 +9,8 @@ import (
 var migrations = []func(*sql.Tx) error{
 	m01_initial,
 	m02_add_item_filters,
+	m03_add_item_pages,
+	m04_add_item_page_blocked,
 }
 
 var maxVersion = int64(len(migrations))
@@ -134,5 +136,22 @@ func m02_add_item_filters(tx *sql.Tx) error {
 		alter table items add column filter_id bigint references filters(id) on delete set null;
 		create index idx_item_filter_id on items(filter_id) where filter_id is not null;
 	`)
+	return err
+}
+
+func m03_add_item_pages(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+		alter table filters add column match_page boolean not null default false;
+
+		create table item_pages (
+			item_id bigint primary key references items(id) on delete cascade,
+			content text not null
+		);
+	`)
+	return err
+}
+
+func m04_add_item_page_blocked(tx *sql.Tx) error {
+	_, err := tx.Exec(`alter table item_pages add column blocked boolean not null default false`)
 	return err
 }

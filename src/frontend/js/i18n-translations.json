@@ -629,6 +629,96 @@
     "zh": "标题或正文",
     "ru": "заголовок или текст"
   },
+  "filter_field_page": {
+    "en": "title or article page",
+    "de": "Titel oder Artikelseite",
+    "fr": "titre ou page de l'article",
+    "es": "título o página del artículo",
+    "ja": "タイトルか記事ページ",
+    "pt": "título ou página do artigo",
+    "zh": "标题或文章页面",
+    "ru": "заголовок или страница статьи"
+  },
+  "filter_page_hint": {
+    "en": "The article page is fetched and searched in its source, without scripts and styles. Paywalls often show in structured data, e.g. \"isAccessibleForFree\":\\s*false",
+    "de": "Die Artikelseite wird abgerufen und in ihrem Quelltext durchsucht, ohne Skripte und Styles. Paywalls zeigen sich oft in strukturierten Daten, z. B. \"isAccessibleForFree\":\\s*false",
+    "fr": "La page de l'article est téléchargée et recherchée dans sa source, sans scripts ni styles. Les paywalls apparaissent souvent dans les données structurées, p. ex. \"isAccessibleForFree\":\\s*false",
+    "es": "La página del artículo se descarga y se busca en su código fuente, sin scripts ni estilos. Los muros de pago suelen aparecer en los datos estructurados, p. ej. \"isAccessibleForFree\":\\s*false",
+    "ja": "記事ページを取得し、スクリプトとスタイルを除いたソースを検索します。ペイウォールは構造化データによく現れます。例: \"isAccessibleForFree\":\\s*false",
+    "pt": "A página do artigo é baixada e pesquisada no código-fonte, sem scripts e estilos. Paywalls costumam aparecer nos dados estruturados, ex. \"isAccessibleForFree\":\\s*false",
+    "zh": "会抓取文章页面，并在去除脚本和样式后的源码中搜索。付费墙通常出现在结构化数据中，例如 \"isAccessibleForFree\":\\s*false",
+    "ru": "Страница статьи загружается, поиск идёт по её исходному коду без скриптов и стилей. Платный доступ часто виден в структурированных данных, напр. \"isAccessibleForFree\":\\s*false"
+  },
+  "filter_page_needs_feed": {
+    "en": "Checking the article page needs a single feed",
+    "de": "Zum Prüfen der Artikelseite muss ein einzelner Feed gewählt sein",
+    "fr": "La vérification de la page de l'article nécessite un seul flux",
+    "es": "Comprobar la página del artículo requiere una sola fuente",
+    "ja": "記事ページを確認するにはフィードを 1 つ選んでください",
+    "pt": "Verificar a página do artigo requer um único feed",
+    "zh": "检查文章页面需要选择单个订阅",
+    "ru": "Для проверки страницы статьи нужно выбрать одну ленту"
+  },
+  "filter_pages_fetching": {
+    "en": "Fetching article pages, { $count } left…",
+    "de": "Artikelseiten werden abgerufen, noch { $count }…",
+    "fr": "Téléchargement des pages, encore { $count }…",
+    "es": "Descargando páginas, quedan { $count }…",
+    "ja": "記事ページを取得中、残り { $count }…",
+    "pt": "Baixando páginas, faltam { $count }…",
+    "zh": "正在抓取文章页面，剩余 { $count }…",
+    "ru": "Загрузка страниц, осталось { $count }…"
+  },
+  "filter_pages_blocked": {
+    "en": "Article pages behind a captcha: { $count }",
+    "de": "Artikelseiten hinter einem Captcha: { $count }",
+    "fr": "Pages d'articles derrière un captcha : { $count }",
+    "es": "Páginas de artículos tras un captcha: { $count }",
+    "ja": "キャプチャで保護された記事ページ: { $count }",
+    "pt": "Páginas de artigos atrás de um captcha: { $count }",
+    "zh": "被验证码拦截的文章页面：{ $count }",
+    "ru": "Страниц статей за капчей: { $count }"
+  },
+  "filter_pages_blocked_notice": {
+    "en": "The site answered with a captcha for { $count } article pages of this feed, so they cannot be checked and their articles stay visible. \"Re-apply\" tries again.",
+    "de": "Die Seite hat bei { $count } Artikelseiten dieses Feeds mit einem Captcha geantwortet. Sie können nicht geprüft werden, die Artikel bleiben sichtbar. „Neu anwenden“ versucht es erneut.",
+    "fr": "Le site a répondu par un captcha pour { $count } pages d'articles de ce flux : elles ne peuvent pas être vérifiées et leurs articles restent visibles. « Réappliquer » réessaie.",
+    "es": "El sitio respondió con un captcha a { $count } páginas de artículos de esta fuente, así que no se pueden comprobar y sus artículos siguen visibles. «Volver a aplicar» lo intenta de nuevo.",
+    "ja": "このフィードの記事ページ { $count } 件でサイトがキャプチャを返したため確認できず、記事は表示されたままです。「再適用」で再試行します。",
+    "pt": "O site respondeu com um captcha para { $count } páginas de artigos deste feed, então elas não podem ser verificadas e os artigos continuam visíveis. \"Reaplicar\" tenta de novo.",
+    "zh": "该网站对此订阅的 { $count } 个文章页面返回了验证码，因此无法检查，这些文章仍会显示。“重新应用”会再试一次。",
+    "ru": "Сайт ответил капчей на { $count } страниц статей этой ленты, поэтому их нельзя проверить и статьи остаются видимыми. «Применить заново» попробует ещё раз."
+  },
+  "filter_refetch": {
+    "en": "Re-apply",
+    "de": "Neu anwenden",
+    "fr": "Réappliquer",
+    "es": "Volver a aplicar",
+    "ja": "再適用",
+    "pt": "Reaplicar",
+    "zh": "重新应用",
+    "ru": "Применить заново"
+  },
+  "filter_refetch_hint": {
+    "en": "Fetch the article pages of this feed again and re-apply the filters, e.g. after fetching them failed",
+    "de": "Die Artikelseiten dieses Feeds erneut abrufen und die Filter neu anwenden, z. B. wenn das Abrufen fehlgeschlagen ist",
+    "fr": "Télécharger à nouveau les pages des articles de ce flux et réappliquer les filtres, p. ex. après un échec",
+    "es": "Descargar de nuevo las páginas de los artículos de esta fuente y volver a aplicar los filtros, p. ej. si falló la descarga",
+    "ja": "このフィードの記事ページを再取得してフィルターを再適用します（取得に失敗した場合など）",
+    "pt": "Baixar novamente as páginas dos artigos deste feed e reaplicar os filtros, ex. após uma falha",
+    "zh": "重新抓取此订阅的文章页面并重新应用过滤器，例如在抓取失败之后",
+    "ru": "Заново загрузить страницы статей этой ленты и применить фильтры, напр. после неудачной загрузки"
+  },
+  "fail_refetch": {
+    "en": "Failed to fetch the article pages again",
+    "de": "Artikelseiten konnten nicht erneut abgerufen werden",
+    "fr": "Impossible de télécharger à nouveau les pages des articles",
+    "es": "No se pudieron volver a descargar las páginas de los artículos",
+    "ja": "記事ページを再取得できませんでした",
+    "pt": "Falha ao baixar novamente as páginas dos artigos",
+    "zh": "重新抓取文章页面失败",
+    "ru": "Не удалось заново загрузить страницы статей"
+  },
   "filter_matches": {
     "en": "matches",
     "de": "passt auf",
