@@ -11,7 +11,7 @@ func (s *SQLiteStorage) ListFilters() []model.Filter {
 	result := make([]model.Filter, 0)
 	rows, err := s.db.Query(`
 		select
-			f.id, f.pattern, f.match_content, f.match_page, f.case_sensitive, f.feed_id, f.enabled,
+			f.id, f.pattern, f.match_content, f.match_page, f.match_link, f.case_sensitive, f.feed_id, f.enabled,
 			(select count(*) from items i where i.filter_id = f.id and i.status != :starred),
 			case when f.match_page then (
 				select count(*) from item_pages p join items i on i.id = p.item_id
@@ -29,7 +29,7 @@ func (s *SQLiteStorage) ListFilters() []model.Filter {
 	for rows.Next() {
 		var f model.Filter
 		err = rows.Scan(
-			&f.Id, &f.Pattern, &f.MatchContent, &f.MatchPage, &f.CaseSensitive, &f.FeedId, &f.Enabled,
+			&f.Id, &f.Pattern, &f.MatchContent, &f.MatchPage, &f.MatchLink, &f.CaseSensitive, &f.FeedId, &f.Enabled,
 			&f.Hidden, &f.Blocked,
 		)
 		if err != nil {
@@ -44,12 +44,13 @@ func (s *SQLiteStorage) ListFilters() []model.Filter {
 func (s *SQLiteStorage) CreateFilter(params model.FilterParams) *model.Filter {
 	var id int64
 	err := s.db.QueryRow(`
-		insert into filters (pattern, match_content, match_page, case_sensitive, feed_id, enabled)
-		values (:pattern, :match_content, :match_page, :case_sensitive, :feed_id, :enabled)
+		insert into filters (pattern, match_content, match_page, match_link, case_sensitive, feed_id, enabled)
+		values (:pattern, :match_content, :match_page, :match_link, :case_sensitive, :feed_id, :enabled)
 		returning id`,
 		sql.Named("pattern", params.Pattern),
 		sql.Named("match_content", params.MatchContent),
 		sql.Named("match_page", params.MatchPage),
+		sql.Named("match_link", params.MatchLink),
 		sql.Named("case_sensitive", params.CaseSensitive),
 		sql.Named("feed_id", params.FeedId),
 		sql.Named("enabled", params.Enabled),
@@ -63,6 +64,7 @@ func (s *SQLiteStorage) CreateFilter(params model.FilterParams) *model.Filter {
 		Pattern:       params.Pattern,
 		MatchContent:  params.MatchContent,
 		MatchPage:     params.MatchPage,
+		MatchLink:     params.MatchLink,
 		CaseSensitive: params.CaseSensitive,
 		FeedId:        params.FeedId,
 		Enabled:       params.Enabled,
@@ -75,6 +77,7 @@ func (s *SQLiteStorage) UpdateFilter(id int64, params model.FilterParams) bool {
 			pattern        = :pattern,
 			match_content  = :match_content,
 			match_page     = :match_page,
+			match_link     = :match_link,
 			case_sensitive = :case_sensitive,
 			feed_id        = :feed_id,
 			enabled        = :enabled
@@ -83,6 +86,7 @@ func (s *SQLiteStorage) UpdateFilter(id int64, params model.FilterParams) bool {
 		sql.Named("pattern", params.Pattern),
 		sql.Named("match_content", params.MatchContent),
 		sql.Named("match_page", params.MatchPage),
+		sql.Named("match_link", params.MatchLink),
 		sql.Named("case_sensitive", params.CaseSensitive),
 		sql.Named("feed_id", params.FeedId),
 		sql.Named("enabled", params.Enabled),
@@ -111,7 +115,7 @@ func (s *SQLiteStorage) ForEachItem(withContent, withPage bool, fn func(item mod
 		page = "p.content"
 	}
 	rows, err := s.db.Query(`
-		select i.id, i.feed_id, i.title, i.date, i.status, i.filter_id, ` + content + `, ` + page + `
+		select i.id, i.feed_id, i.title, i.link, i.date, i.status, i.filter_id, ` + content + `, ` + page + `
 		from items i
 		left join item_pages p on p.item_id = i.id
 	`)
@@ -122,7 +126,7 @@ func (s *SQLiteStorage) ForEachItem(withContent, withPage bool, fn func(item mod
 
 	for rows.Next() {
 		var x model.Item
-		err = rows.Scan(&x.Id, &x.FeedId, &x.Title, &x.Date, &x.Status, &x.FilterId, &x.Content, &x.Page)
+		err = rows.Scan(&x.Id, &x.FeedId, &x.Title, &x.Link, &x.Date, &x.Status, &x.FilterId, &x.Content, &x.Page)
 		if err != nil {
 			return err
 		}
