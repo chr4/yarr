@@ -2,8 +2,9 @@
   <div
     class="d-flex"
     :class="{
-      'feed-selected': feedSelected !== null,
-      'item-selected': itemSelected !== null,
+      'feed-selected': feedSelected !== null && !showFilters,
+      'item-selected': itemSelected !== null && !showFilters,
+      'filters-open': showFilters,
     }">
     <!-- feed list -->
     <div
@@ -25,21 +26,21 @@
           class="c-button-pill ms-1"
           :aria-pressed="filterSelected == 'unread'"
           :title="$t('unread')"
-          @click="filterSelected = 'unread'">
+          @click="selectStatus('unread')">
           <v-icon name="circle-full" />
         </button>
         <button
           class="c-button-pill mx-1"
           :aria-pressed="filterSelected == 'starred'"
           :title="$t('starred')"
-          @click="filterSelected = 'starred'">
+          @click="selectStatus('starred')">
           <v-icon name="star-full" />
         </button>
         <button
           class="c-button-pill me-1"
           :aria-pressed="filterSelected == ''"
           :title="$t('all')"
-          @click="filterSelected = ''">
+          @click="selectStatus('')">
           <v-icon name="assorted" />
         </button>
         <div class="flex-grow-1"></div>
@@ -210,7 +211,8 @@
       <div id="feed-list-scroll" class="p-2 overflow-auto border-top flex-grow-1">
         <v-feedtree
           :tree="feedTree"
-          v-model="feedSelected"
+          :model-value="feedSelected"
+          @update:model-value="selectFeed"
           :filter-selected="filterSelected"
           :stats="stats"
           :feed-errors="feed_errors"
@@ -224,6 +226,18 @@
           $t("refreshing_progress", { count: loading.feeds })
         }}</span>
       </div>
+      <button
+        class="c-listitem filters-entry d-flex align-items-center gap-2 border-0 border-top rounded-0 flex-shrink-0 user-select-none"
+        role="radio"
+        :aria-checked="showFilters"
+        :title="$t('filters')"
+        @click="openFilters()">
+        <v-icon name="filter" />
+        <span class="flex-grow-1 text-start text-truncate">{{ $t("filters") }}</span>
+        <span class="opacity-50" :title="$t('filters_hidden', { count: filtersHidden })" v-if="filtersHidden">
+          {{ filtersHidden }}
+        </span>
+      </button>
     </div>
     <!-- item list -->
     <div
@@ -500,6 +514,9 @@
           :title="$t('open_link')">
           <v-icon name="external-link" />
         </a>
+        <button class="c-button-pill" @click="filterSimilar()" :title="$t('filter_similar')">
+          <v-icon name="filter" />
+        </button>
         <div class="flex-grow-1"></div>
         <button
           class="c-button-pill"
@@ -560,6 +577,21 @@
         </div>
       </div>
     </div>
+    <v-filters
+      v-if="showFilters"
+      :filters="filters"
+      :feeds="feeds"
+      :folders="folders"
+      :feeds-by-id="feedsById"
+      :list-width="itemListWidth"
+      :language="language"
+      :draft="filterDraft"
+      @changed="onFiltersChanged"
+      @close="showFilters = false">
+      <template #list-handle>
+        <v-drag @resize="resizeItemList" @reset="itemListWidth = 300"></v-drag>
+      </template>
+    </v-filters>
     <v-modal :open="showModal !== ''" @hide="showModal = ''">
       <button
         class="c-button-link outline-none position-absolute top-0 end-0 p-2 m-2"
@@ -592,6 +624,7 @@ import icon from "../components/icon.vue";
 import feedTree from "../components/feedtree.vue";
 import newfeed from "../components/newfeed.vue";
 import toast from "../components/toast.vue";
+import filters from "../components/filters.vue";
 import type { FeedTreeNode, TreeFeedNode, TreeFolderNode } from "../components/feedtree.vue";
 import scrollDir from "../directives/scroll";
 import focusDir from "../directives/focus";
@@ -599,6 +632,8 @@ import observeDir from "../directives/observe";
 import { defineComponent, markRaw } from "vue";
 import type {
   Feed,
+  Filter as RegexFilter,
+  FilterParams,
   Folder,
   Item,
   FeedStat,
@@ -666,6 +701,7 @@ export default defineComponent({
     "v-feedtree": feedTree,
     "v-newfeed": newfeed,
     "v-toast": toast,
+    "v-filters": filters,
   },
   directives: {
     scroll: scrollDir,
@@ -698,6 +734,7 @@ export default defineComponent({
 
     if (!feedsErr) {
       this.refreshItems(false);
+      this.refreshFilters();
       this.computeStats();
     }
 
@@ -746,6 +783,10 @@ export default defineComponent({
         feeds: Record<number, Stats>;
         total: Stats;
       },
+
+      showFilters: false,
+      filters: [] as RegexFilter[],
+      filterDraft: null as Partial<FilterParams> | null,
 
       showModal: "" as "" | "shortcuts" | "newfeed",
       refreshAvailable: true,
@@ -866,6 +907,9 @@ export default defineComponent({
       if (this.feedSelected === "") return this.stats.total.unread;
       return 0;
     },
+    filtersHidden(): number {
+      return this.filters.reduce((sum, f) => sum + (f.enabled ? f.hidden : 0), 0);
+    },
     searchScope(): string {
       var type = (this.feedSelected || "").split(":", 2)[0];
       if (type == "feed")
@@ -944,6 +988,7 @@ export default defineComponent({
       this.computeStats();
     },
     async feedSelected(newVal, oldVal) {
+      this.showFilters = false;
       if (oldVal === undefined) return;
       this.itemSelected = null;
       this.items = [];
@@ -966,6 +1011,7 @@ export default defineComponent({
         this.itemSelectedDetails = null;
         return;
       }
+      this.showFilters = false;
       if (this.$refs.content) this.$refs.content.scrollTop = 0;
 
       const [itemErr, item] = await to(api.items.get(newVal));
@@ -1393,6 +1439,56 @@ export default defineComponent({
         this.refreshStats();
         this.refreshFeeds();
       }
+    },
+    selectStatus(status: Filter) {
+      this.showFilters = false;
+      this.filterSelected = status;
+    },
+    selectFeed(feed: string) {
+      // also leaves the filters when picking the feed that is already selected
+      this.showFilters = false;
+      this.feedSelected = feed;
+    },
+    openFilters(draft: Partial<FilterParams> | null = null) {
+      this.filterDraft = draft;
+      this.itemSelected = null;
+      this.showFilters = true;
+      this.refreshFilters();
+    },
+    filterSimilar() {
+      const item = this.itemSelectedDetails;
+      if (!item) return;
+      // start from the selected words, if any, or else from the whole title
+      const selection = window.getSelection();
+      const selected =
+        selection && this.$refs.content?.contains(selection.anchorNode)
+          ? selection.toString().trim()
+          : "";
+      const text = selected || item.title;
+      this.openFilters({
+        pattern: text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+        match_content: !!selected && !item.title.includes(selected),
+        feed_id: item.feed_id,
+      });
+    },
+    async refreshFilters() {
+      const [err, filters] = await to(api.filters.list());
+      if (err) {
+        this.$refs.toast.addToast(
+          { title: this.$t("fail_load"), description: this.errDescription(err) },
+          { level: "fail", closeable: false },
+        );
+        return;
+      }
+      this.filters = filters;
+    },
+    onFiltersChanged() {
+      this.refreshFilters();
+      this.refreshStats();
+      // the item list is hidden behind the filters, reload it for when it shows again
+      this.items = [];
+      this.itemsHasMore = true;
+      this.refreshItems(false);
     },
     onFeedCreated(feed: Feed) {
       this.refreshFeeds();
