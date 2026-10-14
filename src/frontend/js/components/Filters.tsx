@@ -20,7 +20,7 @@ const PREVIEW_DELAY = 300;
 // asking again for the preview while article pages are fetched
 const PAGES_POLL_DELAY = 2000;
 
-type Field = "title" | "content" | "page";
+type Field = "title" | "content" | "page" | "link";
 
 const EXAMPLES = [
   { pattern: "sponsored|advertisement", content: false },
@@ -45,6 +45,7 @@ function emptyForm(): FilterParams {
     pattern: "",
     match_content: false,
     match_page: false,
+    match_link: false,
     case_sensitive: false,
     feed_id: null,
     enabled: true,
@@ -56,14 +57,16 @@ function sameForm(a: FilterParams, b: FilterParams): boolean {
     a.pattern === b.pattern &&
     a.match_content === b.match_content &&
     a.match_page === b.match_page &&
+    a.match_link === b.match_link &&
     a.case_sensitive === b.case_sensitive &&
     a.feed_id === b.feed_id &&
     a.enabled === b.enabled
   );
 }
 
-function fieldOf(f: Pick<FilterParams, "match_content" | "match_page">): Field {
+function fieldOf(f: Pick<FilterParams, "match_content" | "match_page" | "match_link">): Field {
   if (f.match_page) return "page";
+  if (f.match_link) return "link";
   return f.match_content ? "content" : "title";
 }
 
@@ -114,8 +117,8 @@ export default function Filters({
     if (selected.value === "new") return emptyForm();
     const f = filters.find(f => f.id === selected.value);
     if (!f) return null;
-    const { pattern, match_content, match_page, case_sensitive, feed_id, enabled } = f;
-    return { pattern, match_content, match_page, case_sensitive, feed_id, enabled };
+    const { pattern, match_content, match_page, match_link, case_sensitive, feed_id, enabled } = f;
+    return { pattern, match_content, match_page, match_link, case_sensitive, feed_id, enabled };
   };
   // pages are fetched only for the feeds that need them
   const pageNeedsFeed = form.value.match_page && form.value.feed_id === null;
@@ -189,14 +192,21 @@ export default function Filters({
 
   useEffect(() => () => clearTimeout(pagesPoll.current), []);
 
-  const fieldLabel = (f: Pick<FilterParams, "match_content" | "match_page">): string => {
+  const fieldLabel = (
+    f: Pick<FilterParams, "match_content" | "match_page" | "match_link">,
+  ): string => {
     const field = fieldOf(f);
     if (field === "page") return t("filter_field_page");
+    if (field === "link") return t("filter_field_link");
     return field === "content" ? t("filter_field_content") : t("filter_field_title");
   };
 
   const setField = (field: Field) =>
-    updateForm({ match_content: field === "content", match_page: field === "page" });
+    updateForm({
+      match_content: field === "content",
+      match_page: field === "page",
+      match_link: field === "link",
+    });
 
   const updateForm = (partial: Partial<FilterParams>) => {
     form.value = { ...form.value, ...partial };
@@ -468,6 +478,12 @@ export default function Filters({
                     onClick={() => setField("page")}>
                     {t("filter_field_page")}
                   </button>
+                  <button
+                    type="button"
+                    aria-pressed={fieldOf(form.value) === "link"}
+                    onClick={() => setField("link")}>
+                    {t("filter_field_link")}
+                  </button>
                 </div>
                 <span>{t("filter_matches")}</span>
               </div>
@@ -508,7 +524,7 @@ export default function Filters({
 
               <div
                 className={`d-flex flex-wrap align-items-center gap-2 ${
-                  form.value.match_page ? "mb-1" : "mb-3"
+                  form.value.match_page || form.value.match_link ? "mb-1" : "mb-3"
                 }`}>
                 <label htmlFor="filter-scope">{t("filter_in")}</label>
                 <select
@@ -532,12 +548,14 @@ export default function Filters({
                   ))}
                 </select>
               </div>
-              {form.value.match_page && (
+              {(form.value.match_page || form.value.match_link) && (
                 <div className="small mb-3">
                   {pageNeedsFeed ? (
                     <span className="text-danger">{t("filter_page_needs_feed")}</span>
-                  ) : (
+                  ) : form.value.match_page ? (
                     <span className="opacity-75">{t("filter_page_hint")}</span>
+                  ) : (
+                    <span className="opacity-75">{t("filter_link_hint")}</span>
                   )}
                 </div>
               )}
