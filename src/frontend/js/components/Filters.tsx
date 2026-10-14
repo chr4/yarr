@@ -1,5 +1,6 @@
 import { useSignal, useComputed } from "@preact/signals";
 import { useEffect, useMemo, useRef } from "preact/hooks";
+import type { ComponentChildren } from "preact";
 import api, { HTTPError } from "../api";
 import { useI18n } from "../i18n";
 import { debounce, to } from "../utils";
@@ -56,6 +57,8 @@ interface FiltersProps {
   draft: Partial<FilterParams> | null;
   onClose: () => void;
   onChanged: () => void;
+  // resize handle, shared with the item list
+  listHandle?: ComponentChildren;
 }
 
 export default function Filters({
@@ -68,6 +71,7 @@ export default function Filters({
   draft,
   onClose,
   onChanged,
+  listHandle,
 }: FiltersProps) {
   const { t } = useI18n();
 
@@ -207,11 +211,13 @@ export default function Filters({
   return (
     <div
       id="col-filters"
+      style={{ minWidth: 0 }}
       className={`vh-100 d-flex flex-grow-1 ${selected.value !== null ? "is-editing" : ""}`}>
       {/* filter list */}
       <div
-        className="filters-list d-flex flex-column border-end flex-shrink-0"
+        className="filters-list position-relative d-flex flex-column border-end flex-shrink-0"
         style={{ width: `${listWidth}px` }}>
+        {listHandle}
         <div className="px-2 py-1 d-flex gap-1 align-items-center">
           <Tooltip label={t("show_feeds")}>
             <button
@@ -226,10 +232,12 @@ export default function Filters({
             {t("filters")}
           </div>
           {totalHidden > 0 && (
-            <span className="flex-shrink-0 d-flex align-items-center gap-1 px-1 small opacity-75 user-select-none">
-              <Icon name="eye-off" />
-              {t("filters_hidden", { count: totalHidden })}
-            </span>
+            <Tooltip label={t("filters_hidden", { count: totalHidden })} className="flex-shrink-0">
+              <span className="d-flex align-items-center gap-1 px-1 small opacity-75 user-select-none">
+                <Icon name="eye-off" />
+                {totalHidden}
+              </span>
+            </Tooltip>
           )}
           <Tooltip label={t("new_filter")}>
             <button

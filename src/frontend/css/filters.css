@@ -105,8 +105,13 @@
   opacity: 0.35;
 }
 
+.filter-example {
+  max-width: 100%;
+}
+
 .filter-example code {
   color: inherit;
+  overflow-wrap: anywhere;
 }
 
 .filters-form {
