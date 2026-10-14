@@ -170,37 +170,55 @@ func fetchPageOrEmpty(url string) string {
 	return page
 }
 
+// feeds whose pages are being fetched, with the number of pages left
 var pageJobs = struct {
 	sync.Mutex
-	feeds map[int64]bool
-}{feeds: make(map[int64]bool)}
+	left map[int64]int
+}{left: make(map[int64]int)}
 
-// FetchingPages reports whether the pages of a feed are being fetched.
-func FetchingPages(feedId int64) bool {
+// PagesLeft reports how many pages of a feed are left to fetch, and whether
+// they are being fetched.
+func PagesLeft(feedId int64) (int, bool) {
 	pageJobs.Lock()
 	defer pageJobs.Unlock()
-	return pageJobs.feeds[feedId]
+	left, ok := pageJobs.left[feedId]
+	return left, ok
 }
 
 // FetchMissingPages fetches, in the background, the pages missing among the
 // newest items of a feed, and re-applies the filters as they arrive.
-// It reports whether there was anything to fetch.
+// It reports whether the pages are being fetched.
 func FetchMissingPages(db storage.Storage, feedId int64) bool {
+	busy, started := fetchPages(db, feedId, true)
+	return busy || started
+}
+
+// RefetchPages fetches the pages of the newest items of a feed again, in the
+// background, replacing the stored ones as they arrive so that items stay
+// hidden meanwhile. It reports false if the pages are being fetched already.
+func RefetchPages(db storage.Storage, feedId int64) bool {
+	busy, _ := fetchPages(db, feedId, false)
+	return !busy
+}
+
+// fetchPages reports whether the pages of the feed were being fetched
+// already, and else whether it started fetching them.
+func fetchPages(db storage.Storage, feedId int64, onlyMissing bool) (busy, started bool) {
 	pageJobs.Lock()
 	defer pageJobs.Unlock()
-	if pageJobs.feeds[feedId] {
-		return true
+	if _, ok := pageJobs.left[feedId]; ok {
+		return true, false
 	}
-	items := db.ListItemsWithoutPage(feedId, PageWindow)
+	items := db.ListPageItems(feedId, PageWindow, onlyMissing)
 	if len(items) == 0 {
-		return false
+		return false, false
 	}
-	pageJobs.feeds[feedId] = true
+	pageJobs.left[feedId] = len(items)
 
 	go func() {
 		defer func() {
 			pageJobs.Lock()
-			delete(pageJobs.feeds, feedId)
+			delete(pageJobs.left, feedId)
 			pageJobs.Unlock()
 		}()
 		log.Printf("fetching %d pages of feed %d", len(items), feedId)
@@ -231,7 +249,10 @@ func FetchMissingPages(db storage.Storage, feedId int64) bool {
 			if err := filter.Refilter(db); err != nil {
 				log.Print(err)
 			}
+			pageJobs.Lock()
+			pageJobs.left[feedId] -= len(batch)
+			pageJobs.Unlock()
 		}
 	}()
-	return true
+	return false, true
 }
