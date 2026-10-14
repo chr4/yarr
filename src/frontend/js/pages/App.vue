@@ -150,6 +150,13 @@
               {{ $t("old") }}
             </button>
           </div>
+          <button
+            class="c-dropdown-item w-100 text-start d-flex gap-1"
+            :aria-pressed="markReadOnScroll"
+            @click.stop="markReadOnScroll = !markReadOnScroll">
+            <v-icon class="me-1" :name="markReadOnScroll ? 'check' : 'circle'" />
+            {{ $t("mark_read_on_scroll") }}
+          </button>
           <div class="c-dropdown-divider"></div>
           <header class="c-dropdown-header" role="heading" aria-level="2">
             {{ $t("subscriptions") }}
@@ -361,7 +368,10 @@
         <a
           v-for="item in items"
           :key="item.id"
+          :data-id="item.id"
+          v-observe="readObserver"
           class="c-listitem d-flex flex-column user-select-none"
+          :class="{ 'is-read': item.status === 'read' }"
           :href="item.link || undefined"
           target="_blank"
           rel="noopener noreferrer"
@@ -399,6 +409,12 @@
         <div class="text-center my-3" v-if="itemsHasMore">
           <span class="c-spinner"></span>
         </div>
+        <!-- extra room, so that even the last article can be scrolled out of view -->
+        <div
+          class="flex-shrink-0"
+          style="flex-basis: calc(100% + 1rem)"
+          ref="itemlistSpacer"
+          v-if="markReadOnScroll && items.length"></div>
       </div>
       <div
         class="px-3 py-2 border-top text-danger text-break"
@@ -573,7 +589,8 @@ import toast from "../components/toast.vue";
 import type { FeedTreeNode, TreeFeedNode, TreeFolderNode } from "../components/feedtree.vue";
 import scrollDir from "../directives/scroll";
 import focusDir from "../directives/focus";
-import { defineComponent } from "vue";
+import observeDir from "../directives/observe";
+import { defineComponent, markRaw } from "vue";
 import type {
   Feed,
   Folder,
@@ -598,10 +615,23 @@ function clampColumnWidth(width: number, min: number, otherColumnWidth: number):
   return Math.min(Math.max(min, width), max);
 }
 
+const STATS_POLL_INTERVAL = 30 * 1000;
+
+function sameFeedStats(a: Record<number, FeedStat>, b: Record<number, FeedStat>): boolean {
+  const ids = Object.keys(b);
+  if (Object.keys(a).length !== ids.length) return false;
+  return ids.every(id => {
+    const x = a[+id];
+    const y = b[+id];
+    return !!x && x.unread === y.unread && x.starred === y.starred;
+  });
+}
+
 declare module "vue" {
   interface ComponentCustomProperties {
     $refs: {
       itemlist: HTMLElement;
+      itemlistSpacer: HTMLElement | undefined;
       content: HTMLElement;
       opmlInputForm: HTMLFormElement;
       menuDropdown: InstanceType<typeof dropdown>;
@@ -634,6 +664,7 @@ export default defineComponent({
   directives: {
     scroll: scrollDir,
     focus: focusDir,
+    observe: observeDir,
   },
   async created() {
     this.updateMetaTheme();
@@ -663,9 +694,24 @@ export default defineComponent({
       this.refreshItems(false);
       this.computeStats();
     }
+
+    // pick up feeds refreshed in the background (auto-refresh, other clients)
+    this._pollTimer = window.setInterval(() => {
+      if (document.visibilityState === "visible") this.refreshStats();
+    }, STATS_POLL_INTERVAL);
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
+  },
+  mounted() {
+    this.readObserver = new IntersectionObserver(this.onItemIntersect, {
+      root: this.$refs.itemlist,
+    });
   },
   beforeUnmount() {
+    this.readObserver?.disconnect();
     this._colorSchemeMql?.removeEventListener("change", this.updateMetaTheme);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    if (this._pollTimer) window.clearInterval(this._pollTimer);
+    if (this._statsTimer) window.clearTimeout(this._statsTimer);
   },
   data() {
     var s = app.settings;
@@ -687,6 +733,7 @@ export default defineComponent({
       itemSearch: "",
       itemSortNewestFirst: s.sort_newest_first as boolean,
       itemListWidth: s.item_list_width || 300,
+      markReadOnScroll: !!s.mark_read_on_scroll,
 
       stats: { folders: {}, feeds: {}, total: { unread: 0, starred: 0 } } as {
         folders: Record<number, Stats>;
@@ -741,6 +788,10 @@ export default defineComponent({
       ] as SettingsLanguage[],
 
       _colorSchemeMql: null as MediaQueryList | null,
+      _statsTimer: null as number | null,
+      _pollTimer: null as number | null,
+      readObserver: null as IntersectionObserver | null,
+      _seenItems: markRaw(new WeakSet<Element>()),
     };
   },
   computed: {
@@ -933,6 +984,16 @@ export default defineComponent({
     itemSearch() {
       this.$debounce("watch:itemSearch", this.refreshItems, 500);
     },
+    markReadOnScroll(newVal) {
+      api.settings.update({ mark_read_on_scroll: newVal });
+    },
+    items() {
+      // the old list is still rendered here. when everything was already scrolled past,
+      // new items would end up out of sight above the viewport
+      if (this.markReadOnScroll && this.itemListScrolledPast()) {
+        this.$nextTick(this.revealNewItems);
+      }
+    },
     async itemSortNewestFirst(newVal, oldVal) {
       if (oldVal === undefined) return;
       const [err] = await to(api.settings.update({ sort_newest_first: newVal }));
@@ -1001,7 +1062,10 @@ export default defineComponent({
 
       document.documentElement.dataset.theme = this.theme.name;
     },
-    async refreshStats(loopMode?: boolean) {
+    onVisibilityChange() {
+      if (document.visibilityState === "visible") this.refreshStats();
+    },
+    async refreshStats() {
       const [err, data] = await to(api.status());
       if (err) {
         this.$refs.toast.addToast(
@@ -1011,14 +1075,24 @@ export default defineComponent({
         return;
       }
 
-      if (loopMode && !this.itemSelected) this.refreshItems();
-
       this.loading.feeds = data.running;
       this.refreshAvailable = data.refresh;
-      if (data.running) {
-        setTimeout(() => this.refreshStats(true), 500);
+      // poll while feeds are being refreshed, keeping a single polling loop
+      if (data.running && !this._statsTimer) {
+        this._statsTimer = window.setTimeout(() => {
+          this._statsTimer = null;
+          this.refreshStats();
+        }, 500);
       }
-      this.feedStats = data.stats.reduce((acc, stat) => ({ ...acc, [stat.feed_id]: stat }), {});
+      const oldStats = this.feedStats;
+      const newStats: Record<number, FeedStat> = data.stats.reduce(
+        (acc, stat) => ({ ...acc, [stat.feed_id]: stat }),
+        {},
+      );
+      this.feedStats = newStats;
+      if (Object.keys(oldStats).length && !sameFeedStats(oldStats, newStats)) {
+        this.mergeNewItems();
+      }
 
       const [feedErr, errors] = await to(api.feeds.list_errors());
       if (feedErr) {
@@ -1102,6 +1176,49 @@ export default defineComponent({
         }
       });
     },
+    async mergeNewItems() {
+      // add items fetched in the background without resetting the list,
+      // so that the scroll position, selection and loaded pages are kept
+      if (this.feedSelected === null || this.loading.items) return;
+      if (!this.items.length) return this.refreshItems(false);
+
+      const query = this.getItemsQuery();
+      const [err, data] = await to(api.items.list(query));
+      if (err || this.loading.items) return;
+      if (JSON.stringify(query) !== JSON.stringify(this.getItemsQuery())) return;
+
+      const known = new Set(this.items.map(i => i.id));
+      const fresh = data.list.filter(i => !known.has(i.id));
+      // the whole first page is new, there may be a gap to the loaded items
+      if (data.has_more && fresh.length === data.list.length) return this.refreshItems(false);
+
+      // items sorted after the last loaded one arrive with the next page
+      const last = this.items[this.items.length - 1];
+      const added = this.itemsHasMore ? fresh.filter(i => this.compareItems(i, last) < 0) : fresh;
+      if (added.length) {
+        // keep the topmost visible entry in place when items are added above it
+        const el = this.$refs.itemlist;
+        const anchor = Array.from(el.children as HTMLCollectionOf<HTMLElement>).find(
+          c => c.offsetTop + c.offsetHeight > el.scrollTop,
+        );
+        const anchorTop = anchor?.offsetTop ?? 0;
+        this.items = this.items.concat(added).sort(this.compareItems);
+        this.$nextTick(() => {
+          if (anchor && el.scrollTop > 0) el.scrollTop += anchor.offsetTop - anchorTop;
+        });
+      }
+
+      // new items beyond the first page of a fully loaded list
+      if (!this.itemsHasMore && data.has_more) {
+        this.itemsHasMore = true;
+        this.refreshItems(true);
+      }
+    },
+    compareItems(a: Item, b: Item): number {
+      // same order as the server: by date, then by id
+      const diff = Date.parse(a.date) - Date.parse(b.date) || a.id - b.id;
+      return this.itemSortNewestFirst ? -diff : diff;
+    },
     itemListCloseToBottom() {
       // approx. vertical space at the bottom of the list (loading el & paddings) when 1rem = 16px
       var bottomSpace = 70;
@@ -1111,7 +1228,9 @@ export default defineComponent({
 
       if (!el || el.scrollHeight === 0) return false; // element is invisible (responsive design)
 
-      var closeToBottom = el.scrollHeight - el.scrollTop - el.offsetHeight < bottomSpace * scale;
+      var spacerHeight = this.$refs.itemlistSpacer?.offsetHeight || 0;
+      var closeToBottom =
+        el.scrollHeight - el.scrollTop - el.offsetHeight - spacerHeight < bottomSpace * scale;
       return closeToBottom;
     },
     loadMoreItems() {
@@ -1307,6 +1426,79 @@ export default defineComponent({
     },
     toggleItemRead(item: Item) {
       this.toggleItemStatus(item, "unread");
+    },
+    itemListScrolledPast() {
+      const el = this.$refs.itemlist;
+      const items = el?.querySelectorAll(".c-listitem");
+      if (!items?.length || !el.clientHeight) return false;
+      const last = items[items.length - 1];
+      return last.getBoundingClientRect().bottom <= el.getBoundingClientRect().top + el.clientTop;
+    },
+    async revealNewItems() {
+      // read articles are kept in the unread view until the list is reloaded.
+      // drop them now, so that only what is left to read is shown
+      if (this.filterSelected === "unread") {
+        const unread = this.items.filter(i => i.status !== "read" || i.id === this.itemSelected);
+        if (unread.length < this.items.length) {
+          this.items = unread;
+          await this.$nextTick();
+        }
+      }
+      this.scrollToFirstUnread();
+    },
+    scrollToFirstUnread() {
+      const el = this.$refs.itemlist;
+      const item = this.items.find(i => i.status === "unread");
+      const target = item && el.querySelector(`[data-id="${item.id}"]`);
+      if (!target) return;
+      const offset = target.getBoundingClientRect().top - el.getBoundingClientRect().top;
+      el.scrollTop += offset - el.clientTop - parseFloat(getComputedStyle(el).paddingTop);
+    },
+    onItemIntersect(entries: IntersectionObserverEntry[]) {
+      const scrolledOut: Item[] = [];
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          this._seenItems.add(entry.target);
+          continue;
+        }
+        // ignore items that were never on screen (e.g. new items inserted above the viewport)
+        // and the hidden list on small screens
+        if (!this._seenItems.has(entry.target) || !entry.rootBounds?.height) continue;
+        // only items that left through the top were scrolled past
+        if (entry.boundingClientRect.bottom > entry.rootBounds.top) continue;
+        this._seenItems.delete(entry.target);
+        const id = Number((entry.target as HTMLElement).dataset.id);
+        const item = this.items.find(i => i.id === id);
+        if (item?.status === "unread") scrolledOut.push(item);
+      }
+      if (this.markReadOnScroll && scrolledOut.length) this.markScrolledItemsRead(scrolledOut);
+    },
+    async markScrolledItemsRead(items: Item[]) {
+      const setStatus = (item: Item, status: ItemStatus) => {
+        item.status = status;
+        if (this.itemSelectedDetails?.id === item.id) this.itemSelectedDetails.status = status;
+        const stat = this.feedStats[item.feed_id];
+        if (stat) stat.unread += status === "unread" ? 1 : -1;
+      };
+
+      // update optimistically, so that scrolling back and forth does not send duplicate requests
+      items.forEach(item => setStatus(item, "read"));
+      const results = await Promise.all(
+        items.map(item => to(api.items.update(item.id, { status: "read" }))),
+      );
+
+      const failed = results.findIndex(([err]) => err);
+      if (failed === -1) return;
+      results.forEach(([err], i) => {
+        if (err && items[i].status === "read") setStatus(items[i], "unread");
+      });
+      this.$refs.toast.addToast(
+        {
+          title: this.$t("fail_update_article"),
+          description: this.errDescription(results[failed][0]),
+        },
+        { level: "fail", closeable: false },
+      );
     },
     async importOPML(event: Event) {
       const input = event.target as HTMLInputElement;
