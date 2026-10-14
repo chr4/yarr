@@ -49,9 +49,7 @@
             <v-icon name="layers" v-else />
             <span class="text-truncate">{{ scopeTitle(f.feed_id) }}</span>
             <span class="flex-shrink-0">·</span>
-            <span class="flex-shrink-0">
-              {{ f.match_content ? $t("filter_field_content") : $t("filter_field_title") }}
-            </span>
+            <span class="flex-shrink-0">{{ fieldLabel(f) }}</span>
             <span class="flex-grow-1"></span>
             <span class="flex-shrink-0" v-if="!f.enabled">{{ $t("filter_paused") }}</span>
             <span
@@ -111,15 +109,21 @@
             <div class="c-segmented" role="group">
               <button
                 type="button"
-                :aria-pressed="!form.match_content"
-                @click="form.match_content = false">
+                :aria-pressed="fieldOf(form) === 'title'"
+                @click="setField('title')">
                 {{ $t("filter_field_title") }}
               </button>
               <button
                 type="button"
-                :aria-pressed="form.match_content"
-                @click="form.match_content = true">
+                :aria-pressed="fieldOf(form) === 'content'"
+                @click="setField('content')">
                 {{ $t("filter_field_content") }}
+              </button>
+              <button
+                type="button"
+                :aria-pressed="fieldOf(form) === 'page'"
+                @click="setField('page')">
+                {{ $t("filter_field_page") }}
               </button>
             </div>
             <span>{{ $t("filter_matches") }}</span>
@@ -153,7 +157,9 @@
             <span class="opacity-75" v-else>{{ $t("filter_syntax_hint") }}</span>
           </div>
 
-          <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <div
+            class="d-flex flex-wrap align-items-center gap-2"
+            :class="form.match_page ? 'mb-1' : 'mb-3'">
             <label for="filter-scope">{{ $t("filter_in") }}</label>
             <select
               id="filter-scope"
@@ -165,6 +171,10 @@
                 <option v-for="feed in group.feeds" :value="feed.id">{{ feed.title }}</option>
               </optgroup>
             </select>
+          </div>
+          <div class="small mb-3" v-if="form.match_page">
+            <span class="text-danger" v-if="pageNeedsFeed">{{ $t("filter_page_needs_feed") }}</span>
+            <span class="opacity-75" v-else>{{ $t("filter_page_hint") }}</span>
           </div>
 
           <div class="d-flex flex-wrap align-items-center gap-2">
@@ -196,9 +206,21 @@
             </span>
             <span class="c-spinner ms-auto" v-if="preview.loading"></span>
           </div>
+          <div
+            class="d-flex align-items-center gap-2 small opacity-75 mb-2 user-select-none"
+            v-if="preview.pages?.fetching && !preview.error">
+            <span class="c-spinner"></span>
+            {{ $t("filter_pages_fetching", { count: preview.pages.missing }) }}
+          </div>
           <p
             class="opacity-75"
-            v-if="form.pattern.trim() && !preview.loading && !preview.error && !preview.count">
+            v-if="
+              form.pattern.trim() &&
+              !preview.loading &&
+              !preview.error &&
+              !preview.count &&
+              !preview.pages?.fetching
+            ">
             {{ $t("filter_no_matches") }}
           </p>
           <div class="d-flex flex-column gap-1" :class="{ 'opacity-50': preview.loading }">
@@ -239,18 +261,37 @@ import api, { HTTPError } from "../api";
 import { debounce, to } from "../utils";
 import icon from "./icon.vue";
 import relativeTime from "./relative-time.vue";
-import type { Feed, Folder, Filter, FilterParams, FilterPreviewMatch } from "../api-types";
+import type {
+  Feed,
+  Folder,
+  Filter,
+  FilterParams,
+  FilterPreviewMatch,
+  FilterPreviewResponse,
+} from "../api-types";
 
 const PREVIEW_DELAY = 300;
+// asking again for the preview while article pages are fetched
+const PAGES_POLL_DELAY = 2000;
+
+type Field = "title" | "content" | "page";
 
 function emptyForm(): FilterParams {
-  return { pattern: "", match_content: false, case_sensitive: false, feed_id: null, enabled: true };
+  return {
+    pattern: "",
+    match_content: false,
+    match_page: false,
+    case_sensitive: false,
+    feed_id: null,
+    enabled: true,
+  };
 }
 
 function sameForm(a: FilterParams, b: FilterParams): boolean {
   return (
     a.pattern === b.pattern &&
     a.match_content === b.match_content &&
+    a.match_page === b.match_page &&
     a.case_sensitive === b.case_sensitive &&
     a.feed_id === b.feed_id &&
     a.enabled === b.enabled
@@ -281,8 +322,10 @@ export default defineComponent({
         error: "",
         count: 0,
         list: [] as FilterPreviewMatch[],
+        pages: undefined as FilterPreviewResponse["pages"],
       },
       previewSeq: 0,
+      pagesPoll: undefined as ReturnType<typeof setTimeout> | undefined,
       examples: [
         { pattern: "sponsored|advertisement", content: false },
         { pattern: "^\\[(ad|promo)\\]", content: false },
@@ -294,13 +337,16 @@ export default defineComponent({
     this.schedulePreview = debounce(this.runPreview, PREVIEW_DELAY);
     if (this.draft) this.newFilter(this.draft);
   },
+  beforeUnmount() {
+    clearTimeout(this.pagesPoll);
+  },
   computed: {
     original(): FilterParams | null {
       if (this.selected === "new") return emptyForm();
       const f = this.filters.find(f => f.id === this.selected);
       if (!f) return null;
-      const { pattern, match_content, case_sensitive, feed_id, enabled } = f;
-      return { pattern, match_content, case_sensitive, feed_id, enabled };
+      const { pattern, match_content, match_page, case_sensitive, feed_id, enabled } = f;
+      return { pattern, match_content, match_page, case_sensitive, feed_id, enabled };
     },
     dirty(): boolean {
       return !!this.original && !sameForm(this.form, this.original);
@@ -310,8 +356,13 @@ export default defineComponent({
         !this.saving &&
         !!this.form.pattern.trim() &&
         !this.preview.error &&
+        !this.pageNeedsFeed &&
         (this.selected === "new" || this.dirty)
       );
+    },
+    // pages are fetched only for the feeds that need them
+    pageNeedsFeed(): boolean {
+      return this.form.match_page && this.form.feed_id === null;
     },
     totalHidden(): number {
       return this.filters.reduce((sum, f) => sum + (f.enabled ? f.hidden : 0), 0);
@@ -337,9 +388,10 @@ export default defineComponent({
       deep: true,
       handler() {
         this.saveError = "";
-        if (!this.form.pattern.trim()) {
+        clearTimeout(this.pagesPoll);
+        if (!this.form.pattern.trim() || this.pageNeedsFeed) {
           this.previewSeq++;
-          this.preview = { loading: false, error: "", count: 0, list: [] };
+          this.preview = { loading: false, error: "", count: 0, list: [], pages: undefined };
           return;
         }
         this.preview.loading = true;
@@ -350,20 +402,41 @@ export default defineComponent({
   methods: {
     schedulePreview() {},
     async runPreview() {
-      if (!this.form.pattern.trim()) return;
+      if (!this.form.pattern.trim() || this.pageNeedsFeed) return;
       const seq = ++this.previewSeq;
       const [err, data] = await to(api.filters.preview({ ...this.form, enabled: true }));
       if (seq !== this.previewSeq) return; // the form changed in the meantime
       if (err) {
-        this.preview = { loading: false, error: "", count: 0, list: [] };
+        this.preview = { loading: false, error: "", count: 0, list: [], pages: undefined };
         return;
       }
+      const wasFetching = !!this.preview.pages?.fetching;
       this.preview = {
         loading: false,
         error: data.error || "",
         count: data.count,
         list: data.list,
+        pages: data.pages,
       };
+      if (data.pages?.fetching) {
+        this.pagesPoll = setTimeout(() => this.runPreview(), PAGES_POLL_DELAY);
+      } else if (wasFetching) {
+        // the fetched pages may have changed what saved filters hide
+        this.$emit("changed");
+      }
+    },
+    fieldOf(f: Pick<FilterParams, "match_content" | "match_page">): Field {
+      if (f.match_page) return "page";
+      return f.match_content ? "content" : "title";
+    },
+    fieldLabel(f: Pick<FilterParams, "match_content" | "match_page">): string {
+      const field = this.fieldOf(f);
+      if (field === "page") return this.$t("filter_field_page");
+      return field === "content" ? this.$t("filter_field_content") : this.$t("filter_field_title");
+    },
+    setField(field: Field) {
+      this.form.match_content = field === "content";
+      this.form.match_page = field === "page";
     },
     regexLiteral(f: Pick<FilterParams, "pattern" | "case_sensitive">): string {
       return "/" + f.pattern + "/" + (f.case_sensitive ? "" : "i");

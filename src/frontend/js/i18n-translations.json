@@ -579,6 +579,46 @@
     "zh": "标题或正文",
     "ru": "заголовок или текст"
   },
+  "filter_field_page": {
+    "en": "title or article page",
+    "de": "Titel oder Artikelseite",
+    "fr": "titre ou page de l'article",
+    "es": "título o página del artículo",
+    "ja": "タイトルか記事ページ",
+    "pt": "título ou página do artigo",
+    "zh": "标题或文章页面",
+    "ru": "заголовок или страница статьи"
+  },
+  "filter_page_hint": {
+    "en": "The article page is fetched and searched in its source, without scripts and styles. Paywalls often show in structured data, e.g. \"isAccessibleForFree\":\\s*false",
+    "de": "Die Artikelseite wird abgerufen und in ihrem Quelltext durchsucht, ohne Skripte und Styles. Paywalls zeigen sich oft in strukturierten Daten, z. B. \"isAccessibleForFree\":\\s*false",
+    "fr": "La page de l'article est téléchargée et recherchée dans sa source, sans scripts ni styles. Les paywalls apparaissent souvent dans les données structurées, p. ex. \"isAccessibleForFree\":\\s*false",
+    "es": "La página del artículo se descarga y se busca en su código fuente, sin scripts ni estilos. Los muros de pago suelen aparecer en los datos estructurados, p. ej. \"isAccessibleForFree\":\\s*false",
+    "ja": "記事ページを取得し、スクリプトとスタイルを除いたソースを検索します。ペイウォールは構造化データによく現れます。例: \"isAccessibleForFree\":\\s*false",
+    "pt": "A página do artigo é baixada e pesquisada no código-fonte, sem scripts e estilos. Paywalls costumam aparecer nos dados estruturados, ex. \"isAccessibleForFree\":\\s*false",
+    "zh": "会抓取文章页面，并在去除脚本和样式后的源码中搜索。付费墙通常出现在结构化数据中，例如 \"isAccessibleForFree\":\\s*false",
+    "ru": "Страница статьи загружается, поиск идёт по её исходному коду без скриптов и стилей. Платный доступ часто виден в структурированных данных, напр. \"isAccessibleForFree\":\\s*false"
+  },
+  "filter_page_needs_feed": {
+    "en": "Checking the article page needs a single feed",
+    "de": "Zum Prüfen der Artikelseite muss ein einzelner Feed gewählt sein",
+    "fr": "La vérification de la page de l'article nécessite un seul flux",
+    "es": "Comprobar la página del artículo requiere una sola fuente",
+    "ja": "記事ページを確認するにはフィードを 1 つ選んでください",
+    "pt": "Verificar a página do artigo requer um único feed",
+    "zh": "检查文章页面需要选择单个订阅",
+    "ru": "Для проверки страницы статьи нужно выбрать одну ленту"
+  },
+  "filter_pages_fetching": {
+    "en": "Fetching article pages, { $count } left…",
+    "de": "Artikelseiten werden abgerufen, noch { $count }…",
+    "fr": "Téléchargement des pages, encore { $count }…",
+    "es": "Descargando páginas, quedan { $count }…",
+    "ja": "記事ページを取得中、残り { $count }…",
+    "pt": "Baixando páginas, faltam { $count }…",
+    "zh": "正在抓取文章页面，剩余 { $count }…",
+    "ru": "Загрузка страниц, осталось { $count }…"
+  },
   "filter_matches": {
     "en": "matches",
     "de": "passt auf",
