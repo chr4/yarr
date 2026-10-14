@@ -650,14 +650,14 @@
     "ru": "Страниц статей за капчей: { $count }"
   },
   "filter_pages_blocked_notice": {
-    "en": "The site answered with a captcha for { $count } article pages of this feed, so they cannot be checked and their articles stay visible. \"Re-apply\" tries again.",
-    "de": "Die Seite hat bei { $count } Artikelseiten dieses Feeds mit einem Captcha geantwortet. Sie können nicht geprüft werden, die Artikel bleiben sichtbar. „Neu anwenden“ versucht es erneut.",
-    "fr": "Le site a répondu par un captcha pour { $count } pages d'articles de ce flux : elles ne peuvent pas être vérifiées et leurs articles restent visibles. « Réappliquer » réessaie.",
-    "es": "El sitio respondió con un captcha a { $count } páginas de artículos de esta fuente, así que no se pueden comprobar y sus artículos siguen visibles. «Volver a aplicar» lo intenta de nuevo.",
-    "ja": "このフィードの記事ページ { $count } 件でサイトがキャプチャを返したため確認できず、記事は表示されたままです。「再適用」で再試行します。",
-    "pt": "O site respondeu com um captcha para { $count } páginas de artigos deste feed, então elas não podem ser verificadas e os artigos continuam visíveis. \"Reaplicar\" tenta de novo.",
-    "zh": "该网站对此订阅的 { $count } 个文章页面返回了验证码，因此无法检查，这些文章仍会显示。“重新应用”会再试一次。",
-    "ru": "Сайт ответил капчей на { $count } страниц статей этой ленты, поэтому их нельзя проверить и статьи остаются видимыми. «Применить заново» попробует ещё раз."
+    "en": "The site answered with a captcha for { $count } article pages of this feed, so they cannot be checked and their articles stay visible. \"Re-apply\" tries again. Matching the link may work instead.",
+    "de": "Die Seite hat bei { $count } Artikelseiten dieses Feeds mit einem Captcha geantwortet. Sie können nicht geprüft werden, die Artikel bleiben sichtbar. „Neu anwenden“ versucht es erneut. Stattdessen kann ein Filter auf den Link helfen.",
+    "fr": "Le site a répondu par un captcha pour { $count } pages d'articles de ce flux : elles ne peuvent pas être vérifiées et leurs articles restent visibles. « Réappliquer » réessaie. Filtrer sur le lien peut fonctionner à la place.",
+    "es": "El sitio respondió con un captcha a { $count } páginas de artículos de esta fuente, así que no se pueden comprobar y sus artículos siguen visibles. «Volver a aplicar» lo intenta de nuevo. Filtrar por el enlace puede funcionar en su lugar.",
+    "ja": "このフィードの記事ページ { $count } 件でサイトがキャプチャを返したため確認できず、記事は表示されたままです。「再適用」で再試行します。 代わりにリンクで照合すると機能する場合があります。",
+    "pt": "O site respondeu com um captcha para { $count } páginas de artigos deste feed, então elas não podem ser verificadas e os artigos continuam visíveis. \"Reaplicar\" tenta de novo. Filtrar pelo link pode funcionar no lugar.",
+    "zh": "该网站对此订阅的 { $count } 个文章页面返回了验证码，因此无法检查，这些文章仍会显示。“重新应用”会再试一次。也可以改为匹配链接。",
+    "ru": "Сайт ответил капчей на { $count } страниц статей этой ленты, поэтому их нельзя проверить и статьи остаются видимыми. «Применить заново» попробует ещё раз. Вместо этого может подойти фильтр по ссылке."
   },
   "filter_refetch": {
     "en": "Re-apply",
