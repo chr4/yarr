@@ -619,6 +619,36 @@
     "zh": "正在抓取文章页面，剩余 { $count }…",
     "ru": "Загрузка страниц, осталось { $count }…"
   },
+  "filter_refetch": {
+    "en": "Re-apply",
+    "de": "Neu anwenden",
+    "fr": "Réappliquer",
+    "es": "Volver a aplicar",
+    "ja": "再適用",
+    "pt": "Reaplicar",
+    "zh": "重新应用",
+    "ru": "Применить заново"
+  },
+  "filter_refetch_hint": {
+    "en": "Fetch the article pages of this feed again and re-apply the filters, e.g. after fetching them failed",
+    "de": "Die Artikelseiten dieses Feeds erneut abrufen und die Filter neu anwenden, z. B. wenn das Abrufen fehlgeschlagen ist",
+    "fr": "Télécharger à nouveau les pages des articles de ce flux et réappliquer les filtres, p. ex. après un échec",
+    "es": "Descargar de nuevo las páginas de los artículos de esta fuente y volver a aplicar los filtros, p. ej. si falló la descarga",
+    "ja": "このフィードの記事ページを再取得してフィルターを再適用します（取得に失敗した場合など）",
+    "pt": "Baixar novamente as páginas dos artigos deste feed e reaplicar os filtros, ex. após uma falha",
+    "zh": "重新抓取此订阅的文章页面并重新应用过滤器，例如在抓取失败之后",
+    "ru": "Заново загрузить страницы статей этой ленты и применить фильтры, напр. после неудачной загрузки"
+  },
+  "fail_refetch": {
+    "en": "Failed to fetch the article pages again",
+    "de": "Artikelseiten konnten nicht erneut abgerufen werden",
+    "fr": "Impossible de télécharger à nouveau les pages des articles",
+    "es": "No se pudieron volver a descargar las páginas de los artículos",
+    "ja": "記事ページを再取得できませんでした",
+    "pt": "Falha ao baixar novamente as páginas dos artigos",
+    "zh": "重新抓取文章页面失败",
+    "ru": "Не удалось заново загрузить страницы статей"
+  },
   "filter_matches": {
     "en": "matches",
     "de": "passt auf",

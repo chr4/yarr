@@ -174,5 +174,5 @@ export interface FilterPreviewResponse {
   count: number;
   list: FilterPreviewMatch[];
   // only for filters checking the article page
-  pages?: { fetching: boolean; missing: number };
+  pages?: { fetching: boolean; left: number };
 }
