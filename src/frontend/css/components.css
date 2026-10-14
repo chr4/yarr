@@ -337,3 +337,15 @@
   touch-action: none;
   user-select: none;
 }
+
+.c-pending-items {
+  z-index: 1;
+  white-space: nowrap;
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.12);
+
+  &,
+  &:hover {
+    color: var(--v-active-fg);
+    background-color: var(--v-active-bg);
+  }
+}
