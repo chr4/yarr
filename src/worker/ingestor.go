@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/nkanaev/yarr/src/filter"
 	"github.com/nkanaev/yarr/src/parser/opml"
 	"github.com/nkanaev/yarr/src/server"
 	"github.com/nkanaev/yarr/src/storage"
@@ -49,6 +50,7 @@ func (w *Worker) AddFeed(ctx context.Context, store storage.Storage, link server
 	})
 	items := ConvertItems(result.Feed.Items, *feed)
 	if len(items) > 0 {
+		filter.ApplyStored(store, items)
 		store.CreateItems(items)
 	}
 	if feed.Icon == nil {
