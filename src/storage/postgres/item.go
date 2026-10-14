@@ -48,7 +48,8 @@ func (s *PostgresStorage) CreateItems(items []model.Item) bool {
 
 	for _, item := range items {
 		searchText := item.Title + " " + htmlutil.ExtractText(item.Content)
-		_, err = tx.Exec(`
+		var id int64
+		err = tx.QueryRow(`
 			insert into items (
 				guid, feed_id, title, link, date,
 				content, media_links,
@@ -62,7 +63,8 @@ func (s *PostgresStorage) CreateItems(items []model.Item) bool {
 				to_tsvector('simple', $11), $12
 			)
 			on conflict (feed_id, guid) do update set
-				last_arrived = excluded.last_arrived`,
+				last_arrived = excluded.last_arrived
+			returning id`,
 			item.GUID,
 			item.FeedId,
 			item.Title,
@@ -75,7 +77,10 @@ func (s *PostgresStorage) CreateItems(items []model.Item) bool {
 			item.Status,
 			searchText,
 			item.FilterId,
-		)
+		).Scan(&id)
+		if err == nil && item.Page != nil {
+			err = setItemPage(tx, id, *item.Page)
+		}
 		if err != nil {
 			log.Print(err)
 			if err = tx.Rollback(); err != nil {

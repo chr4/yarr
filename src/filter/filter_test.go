@@ -91,3 +91,52 @@ func TestPreview(t *testing.T) {
 		t.Error("expected an invalid pattern to fail")
 	}
 }
+
+func TestMatchPage(t *testing.T) {
+	feed := int64(1)
+	if err := Check(model.FilterParams{Pattern: "paywall", MatchPage: true}); err != ErrPageNeedsFeed {
+		t.Errorf("expected a page filter for all feeds to be rejected, got %v", err)
+	}
+	m := New([]model.Filter{
+		{Id: 1, Pattern: "paywall", MatchPage: true, Enabled: true},
+		{Id: 2, Pattern: "subscribe", MatchPage: true, FeedId: &feed, Enabled: true},
+	})
+	if !m.NeedsPage(1) || m.NeedsPage(2) {
+		t.Error("expected only feed 1 to need pages")
+	}
+	if feeds := m.PageFeeds(); len(feeds) != 1 || feeds[0] != 1 {
+		t.Errorf("expected only feed 1 to need pages, got %v", feeds)
+	}
+
+	page := "<p>Subscribe to read on</p>"
+	if have := m.Match(model.Item{FeedId: 1, Title: "news"}); have != nil {
+		t.Errorf("expected no match without page, got %d", *have)
+	}
+	if have := m.Match(model.Item{FeedId: 1, Title: "news", Page: &page}); have == nil || *have != 2 {
+		t.Errorf("expected filter 2 to match the page, got %v", have)
+	}
+	if have := m.Match(model.Item{FeedId: 2, Title: "news", Page: &page}); have != nil {
+		t.Errorf("expected no match in another feed, got %d", *have)
+	}
+}
+
+func TestPreviewPage(t *testing.T) {
+	db, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	feed := db.CreateFeed(model.CreateFeedParams{Title: "feed", FeedLink: "http://example.com/feed.xml"})
+	page := `<div class="article"> lorem ipsum </div><div class="paywall">Subscribe now</div>`
+	db.CreateItems([]model.Item{
+		{GUID: "1", FeedId: feed.Id, Title: "news", Page: &page, Date: time.Now()},
+		{GUID: "2", FeedId: feed.Id, Title: "more news", Date: time.Now()},
+	})
+
+	count, list, err := Preview(db, model.FilterParams{Pattern: `class="paywall"`, MatchPage: true, FeedId: &feed.Id}, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 || list[0].Field != "page" || list[0].Match != `class="paywall"` || list[0].After != ">Subscribe now</div>" {
+		t.Fatalf("expected the page to match, got %d: %+v", count, list)
+	}
+}
