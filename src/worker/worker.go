@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/nkanaev/yarr/src/filter"
 	"github.com/nkanaev/yarr/src/storage"
 	"github.com/nkanaev/yarr/src/storage/model"
 )
@@ -118,6 +119,7 @@ func (w *Worker) refresher(feeds []model.Feed) {
 	for range feeds {
 		items := <-dstqueue
 		if len(items) > 0 {
+			filter.ApplyStored(w.db, items)
 			w.db.CreateItems(items)
 		}
 		atomic.AddInt32(w.pending, -1)
