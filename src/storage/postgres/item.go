@@ -53,13 +53,13 @@ func (s *PostgresStorage) CreateItems(items []model.Item) bool {
 				guid, feed_id, title, link, date,
 				content, media_links,
 				date_arrived, last_arrived, status,
-				search
+				search, filter_id
 			)
 			values (
 				$1, $2, $3, $4, $5,
 				$6, $7,
 				$8, $9, $10,
-				to_tsvector('simple', $11)
+				to_tsvector('simple', $11), $12
 			)
 			on conflict (feed_id, guid) do update set
 				last_arrived = excluded.last_arrived`,
@@ -74,6 +74,7 @@ func (s *PostgresStorage) CreateItems(items []model.Item) bool {
 			now,
 			item.Status,
 			searchText,
+			item.FilterId,
 		)
 		if err != nil {
 			log.Print(err)
@@ -165,6 +166,9 @@ func listQueryPredicate(filter model.ItemFilter, newestFirst bool) (string, []an
 	return predicate, args
 }
 
+// items hidden by a filter are left out, unless they were starred
+var visiblePredicate = fmt.Sprintf("(i.filter_id is null or i.status = %d)", model.STARRED)
+
 func (s *PostgresStorage) CountItems() int {
 	var count int
 	err := s.db.QueryRow(`select count(*) from items`).Scan(&count)
@@ -182,6 +186,7 @@ func (s *PostgresStorage) ListItems(
 	withContent bool,
 ) []model.Item {
 	predicate, args := listQueryPredicate(filter, newestFirst)
+	predicate += " and " + visiblePredicate
 	result := make([]model.Item, 0)
 
 	order := "date desc, id desc"
@@ -285,7 +290,7 @@ func (s *PostgresStorage) FeedStats() []model.FeedStat {
 	rows, err := s.db.Query(fmt.Sprintf(`
 		select
 			feed_id,
-			sum(case status when %d then 1 else 0 end),
+			sum(case when status = %d and filter_id is null then 1 else 0 end),
 			sum(case status when %d then 1 else 0 end)
 		from items
 		group by feed_id
