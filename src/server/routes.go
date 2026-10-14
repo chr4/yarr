@@ -528,7 +528,7 @@ func (s *Server) handlePageCrawl(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if isInternalFromURL(url) {
+	if worker.IsInternalURL(url) {
 		log.Printf("attempt to access internal IP %s from %s", url, r.RemoteAddr)
 		return
 	}
@@ -582,7 +582,7 @@ func decodeFilterParams(w http.ResponseWriter, r *http.Request) (model.FilterPar
 		w.WriteHeader(http.StatusBadRequest)
 		return params, false
 	}
-	if _, err := filter.Compile(params.Pattern, params.CaseSensitive); err != nil {
+	if err := filter.Check(params); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return params, false
 	}
@@ -590,10 +590,14 @@ func decodeFilterParams(w http.ResponseWriter, r *http.Request) (model.FilterPar
 }
 
 // refilter applies changed filters to the stored items and returns the
-// filter with the given id, as stored.
+// filter with the given id, as stored. Pages missing for filters checking
+// them are fetched in the background.
 func (s *Server) refilter(r *http.Request, id int64) *model.Filter {
 	if err := filter.Refilter(s.db(r)); err != nil {
 		log.Print(err)
+	}
+	for _, feedId := range filter.New(s.db(r).ListFilters()).PageFeeds() {
+		worker.FetchMissingPages(s.db(r), feedId)
 	}
 	for _, f := range s.db(r).ListFilters() {
 		if f.Id == id {
@@ -674,5 +678,14 @@ func (s *Server) handleFilterPreview(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"error": err.Error(), "count": 0, "list": []any{}})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"count": count, "list": matches})
+	result := map[string]any{"count": count, "list": matches}
+	if params.MatchPage {
+		// matches grow while the pages are fetched, so the preview is asked again until done
+		fetching := worker.FetchMissingPages(s.db(r), *params.FeedId)
+		result["pages"] = map[string]any{
+			"fetching": fetching,
+			"missing":  len(s.db(r).ListItemsWithoutPage(*params.FeedId, worker.PageWindow)),
+		}
+	}
+	writeJSON(w, http.StatusOK, result)
 }

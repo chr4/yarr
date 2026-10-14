@@ -1,8 +1,8 @@
-package server
+package worker
 
 import "testing"
 
-func TestIsInternalFromURL(t *testing.T) {
+func TestIsInternalURL(t *testing.T) {
 	tests := []struct {
 		url      string
 		expected bool
@@ -23,9 +23,9 @@ func TestIsInternalFromURL(t *testing.T) {
 		{"", false},                  // empty string
 	}
 	for _, test := range tests {
-		result := isInternalFromURL(test.url)
+		result := IsInternalURL(test.url)
 		if result != test.expected {
-			t.Errorf("isInternalFromURL(%q) = %v; want %v", test.url, result, test.expected)
+			t.Errorf("IsInternalURL(%q) = %v; want %v", test.url, result, test.expected)
 		}
 	}
 }
