@@ -11,7 +11,7 @@ func (s *PostgresStorage) ListFilters() []model.Filter {
 	result := make([]model.Filter, 0)
 	rows, err := s.db.Query(`
 		select
-			f.id, f.pattern, f.match_content, f.match_page, f.case_sensitive, f.feed_id, f.enabled,
+			f.id, f.pattern, f.match_content, f.match_page, f.match_link, f.case_sensitive, f.feed_id, f.enabled,
 			(select count(*) from items i where i.filter_id = f.id and i.status != $1),
 			case when f.match_page then (
 				select count(*) from item_pages p join items i on i.id = p.item_id
@@ -29,7 +29,7 @@ func (s *PostgresStorage) ListFilters() []model.Filter {
 	for rows.Next() {
 		var f model.Filter
 		err = rows.Scan(
-			&f.Id, &f.Pattern, &f.MatchContent, &f.MatchPage, &f.CaseSensitive, &f.FeedId, &f.Enabled,
+			&f.Id, &f.Pattern, &f.MatchContent, &f.MatchPage, &f.MatchLink, &f.CaseSensitive, &f.FeedId, &f.Enabled,
 			&f.Hidden, &f.Blocked,
 		)
 		if err != nil {
@@ -44,12 +44,13 @@ func (s *PostgresStorage) ListFilters() []model.Filter {
 func (s *PostgresStorage) CreateFilter(params model.FilterParams) *model.Filter {
 	var id int64
 	err := s.db.QueryRow(`
-		insert into filters (pattern, match_content, match_page, case_sensitive, feed_id, enabled)
-		values ($1, $2, $3, $4, $5, $6)
+		insert into filters (pattern, match_content, match_page, match_link, case_sensitive, feed_id, enabled)
+		values ($1, $2, $3, $4, $5, $6, $7)
 		returning id`,
 		params.Pattern,
 		params.MatchContent,
 		params.MatchPage,
+		params.MatchLink,
 		params.CaseSensitive,
 		params.FeedId,
 		params.Enabled,
@@ -63,6 +64,7 @@ func (s *PostgresStorage) CreateFilter(params model.FilterParams) *model.Filter 
 		Pattern:       params.Pattern,
 		MatchContent:  params.MatchContent,
 		MatchPage:     params.MatchPage,
+		MatchLink:     params.MatchLink,
 		CaseSensitive: params.CaseSensitive,
 		FeedId:        params.FeedId,
 		Enabled:       params.Enabled,
@@ -75,14 +77,16 @@ func (s *PostgresStorage) UpdateFilter(id int64, params model.FilterParams) bool
 			pattern        = $2,
 			match_content  = $3,
 			match_page     = $4,
-			case_sensitive = $5,
-			feed_id        = $6,
-			enabled        = $7
+			match_link     = $5,
+			case_sensitive = $6,
+			feed_id        = $7,
+			enabled        = $8
 		where id = $1`,
 		id,
 		params.Pattern,
 		params.MatchContent,
 		params.MatchPage,
+		params.MatchLink,
 		params.CaseSensitive,
 		params.FeedId,
 		params.Enabled,
@@ -111,7 +115,7 @@ func (s *PostgresStorage) ForEachItem(withContent, withPage bool, fn func(item m
 		page = "p.content"
 	}
 	rows, err := s.db.Query(`
-		select i.id, i.feed_id, i.title, i.date, i.status, i.filter_id, ` + content + `, ` + page + `
+		select i.id, i.feed_id, i.title, i.link, i.date, i.status, i.filter_id, ` + content + `, ` + page + `
 		from items i
 		left join item_pages p on p.item_id = i.id
 	`)
@@ -122,7 +126,7 @@ func (s *PostgresStorage) ForEachItem(withContent, withPage bool, fn func(item m
 
 	for rows.Next() {
 		var x model.Item
-		err = rows.Scan(&x.Id, &x.FeedId, &x.Title, &x.Date, &x.Status, &x.FilterId, &x.Content, &x.Page)
+		err = rows.Scan(&x.Id, &x.FeedId, &x.Title, &x.Link, &x.Date, &x.Status, &x.FilterId, &x.Content, &x.Page)
 		if err != nil {
 			return err
 		}
