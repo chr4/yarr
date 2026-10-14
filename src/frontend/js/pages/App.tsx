@@ -12,6 +12,7 @@ import RelativeTime from "../components/RelativeTime";
 import Icon from "../components/Icon";
 import Tooltip from "../components/Tooltip";
 import FeedTree from "../components/FeedTree";
+import Filters from "../components/Filters";
 import NewFeed from "../components/NewFeed";
 import ToastContainer, { showToast } from "../components/Toast";
 import DropdownSettings, { Theme } from "../components/DropdownSettings";
@@ -23,6 +24,8 @@ import type { FeedTreeNode, TreeFeedNode } from "../components/FeedTree";
 import { setupKeybindings, KeyActions } from "../key";
 import type {
   Feed,
+  Filter as RegexFilter,
+  FilterParams,
   Folder,
   Item,
   FeedStat,
@@ -89,6 +92,9 @@ export default function App() {
   // Status & modal
   const showModal = useSignal<"" | "shortcuts">("");
   const showNewFeed = useSignal(false);
+  const showFilters = useSignal(false);
+  const filters = useSignal<RegexFilter[]>([]);
+  const filterDraft = useSignal<Partial<FilterParams> | null>(null);
   const refreshAvailable = useSignal(true);
   const loadingFeeds = useSignal(0);
   const loadingItems = useSignal(false);
@@ -412,6 +418,7 @@ export default function App() {
       itemFullscreen.value = false;
       return;
     }
+    showFilters.value = false;
 
     if (contentRef.current) contentRef.current.scrollTop = 0;
 
@@ -676,6 +683,63 @@ export default function App() {
     updateSettings({ refresh_rate: newRate });
   };
 
+  // Filters
+  const filtersHidden = useComputed(() =>
+    filters.value.reduce((sum, f) => sum + (f.enabled ? f.hidden : 0), 0),
+  );
+
+  const refreshFilters = async () => {
+    const [err, list] = await to(api.filters.list());
+    if (err) {
+      showToast(
+        { title: t("fail_load"), description: errDescription(err) },
+        { level: "fail", closeable: false },
+      );
+      return;
+    }
+    filters.value = list;
+  };
+
+  useEffect(() => {
+    refreshFilters();
+  }, []);
+
+  // selecting a feed leaves the filters
+  useEffect(() => {
+    showFilters.value = false;
+  }, [feedSelected.value]);
+
+  const openFilters = (draft: Partial<FilterParams> | null = null) => {
+    filterDraft.value = draft;
+    itemSelected.value = null;
+    showFilters.value = true;
+    refreshFilters();
+  };
+
+  const filterSimilar = () => {
+    const item = itemSelectedDetails.value;
+    if (!item) return;
+    // start from the selected words, if any, or else from the whole title
+    const selection = window.getSelection();
+    const selected =
+      selection && contentRef.current?.contains(selection.anchorNode)
+        ? selection.toString().trim()
+        : "";
+    const text = selected || item.title;
+    openFilters({
+      pattern: text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+      match_content: !!selected && !item.title.includes(selected),
+      feed_id: item.feed_id,
+    });
+  };
+
+  const onFiltersChanged = () => {
+    refreshFilters();
+    refreshStats();
+    // the item list is hidden behind the filters, reload it for when it shows again
+    refreshItems(false);
+  };
+
   // Keyboard navigation
   const navigateToItem = useCallback(
     (dir: number) => {
@@ -775,9 +839,11 @@ export default function App() {
 
   return (
     <div
-      className={`d-flex ${feedSelected.value !== null ? "feed-selected" : ""} ${
-        itemSelected.value !== null ? "item-selected" : ""
-      } ${itemFullscreen.value ? "item-fullscreen" : ""}`}>
+      className={`d-flex ${
+        feedSelected.value !== null && !showFilters.value ? "feed-selected" : ""
+      } ${itemSelected.value !== null && !showFilters.value ? "item-selected" : ""} ${
+        itemFullscreen.value ? "item-fullscreen" : ""
+      } ${showFilters.value ? "filters-open" : ""}`}>
       {/* Feed list column */}
       <div
         id="col-feed-list"
@@ -817,6 +883,7 @@ export default function App() {
                 aria-label={t("unread")}
                 aria-pressed={filterSelected.value === "unread"}
                 onClick={() => {
+                  showFilters.value = false;
                   filterSelected.value = "unread";
                   updateSettings({ filter: "unread" });
                 }}>
@@ -830,6 +897,7 @@ export default function App() {
                 aria-label={t("starred")}
                 aria-pressed={filterSelected.value === "starred"}
                 onClick={() => {
+                  showFilters.value = false;
                   filterSelected.value = "starred";
                   updateSettings({ filter: "starred" });
                 }}>
@@ -843,6 +911,7 @@ export default function App() {
                 aria-label={t("all")}
                 aria-pressed={filterSelected.value === ""}
                 onClick={() => {
+                  showFilters.value = false;
                   filterSelected.value = "";
                   updateSettings({ filter: "" });
                 }}>
@@ -888,6 +957,8 @@ export default function App() {
             stats={stats.value}
             feedErrors={feedErrors.value}
             onSelect={val => {
+              // also leaves the filters when picking the feed that is already selected
+              showFilters.value = false;
               feedSelected.value = val;
               updateSettings({ feed: val });
             }}
@@ -905,6 +976,20 @@ export default function App() {
             </span>
           </div>
         )}
+        <Tooltip label={t("filters")} className="flex-shrink-0">
+          <button
+            type="button"
+            className="c-listitem filters-entry d-flex align-items-center gap-2 border-0 border-top rounded-0 flex-grow-1 user-select-none"
+            role="radio"
+            aria-checked={showFilters.value}
+            onClick={() => openFilters()}>
+            <Icon name="filter" />
+            <span className="flex-grow-1 text-start text-truncate">{t("filters")}</span>
+            {filtersHidden.value > 0 && (
+              <span className="opacity-50">{filtersHidden.value}</span>
+            )}
+          </button>
+        </Tooltip>
       </div>
 
       {/* Item list column */}
@@ -1072,11 +1157,26 @@ export default function App() {
           )}
           isFullscreen={itemFullscreen.value}
           onToggleFullscreen={() => (itemFullscreen.value = !itemFullscreen.value)}
+          onFilterSimilar={filterSimilar}
           onClose={() => (itemSelected.value = null)}
           contentRef={contentRef}
           language={language.value}
         />
       </div>
+
+      {showFilters.value && (
+        <Filters
+          filters={filters.value}
+          feeds={feeds.value}
+          folders={folders.value}
+          feedsById={feedsById.value}
+          listWidth={itemListWidth.value}
+          language={language.value}
+          draft={filterDraft.value}
+          onChanged={onFiltersChanged}
+          onClose={() => (showFilters.value = false)}
+        />
+      )}
 
       {/* Dialog modal */}
       <Modal open={showModal.value !== ""} onHide={() => (showModal.value = "")}>
