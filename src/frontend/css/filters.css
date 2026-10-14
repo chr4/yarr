@@ -141,3 +141,15 @@
     display: none !important;
   }
 }
+
+/* collapsed feed list: icon only */
+@media (min-width: 992px) {
+  #col-feed-list.is-collapsed .filters-entry {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  #col-feed-list.is-collapsed .filters-entry > :not(.c-icon) {
+    display: none;
+  }
+}
