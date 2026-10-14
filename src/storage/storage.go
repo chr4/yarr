@@ -31,7 +31,7 @@ type Storage interface {
 	ListFolders() []model.Folder
 	ListItemGUIDs(feedId int64) map[string]bool
 	ListItems(filter model.ItemFilter, limit int, newestFirst bool, withContent bool) []model.Item
-	ListItemsWithoutPage(feedId int64, limit int) []model.Item
+	ListPageItems(feedId int64, limit int, onlyMissing bool) []model.Item
 	MarkItemsRead(filter model.MarkFilter) bool
 	SetItemFilters(filterIds map[int64]*int64) bool
 	SetItemPages(pages map[int64]string) bool

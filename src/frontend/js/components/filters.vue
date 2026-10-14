@@ -189,6 +189,15 @@
               v-if="dirty && selected !== 'new'">
               {{ $t("revert") }}
             </button>
+            <button
+              type="button"
+              class="c-button"
+              :title="$t('filter_refetch_hint')"
+              :disabled="dirty || refetching || !!preview.pages?.fetching"
+              @click="refetch()"
+              v-if="original?.match_page && selected !== 'new'">
+              {{ $t("filter_refetch") }}
+            </button>
             <button type="submit" class="c-button c-button-primary" :disabled="!canSave">
               {{ $t("save") }}
             </button>
@@ -210,7 +219,7 @@
             class="d-flex align-items-center gap-2 small opacity-75 mb-2 user-select-none"
             v-if="preview.pages?.fetching && !preview.error">
             <span class="c-spinner"></span>
-            {{ $t("filter_pages_fetching", { count: preview.pages.missing }) }}
+            {{ $t("filter_pages_fetching", { count: preview.pages.left }) }}
           </div>
           <p
             class="opacity-75"
@@ -316,6 +325,7 @@ export default defineComponent({
       selected: null as number | "new" | null,
       form: emptyForm(),
       saving: false,
+      refetching: false,
       saveError: "",
       preview: {
         loading: false,
@@ -479,6 +489,21 @@ export default defineComponent({
       this.form.pattern = data.pattern;
       this.$emit("changed");
       this.selected = saved.id;
+    },
+    async refetch() {
+      if (typeof this.selected !== "number") return;
+      this.refetching = true;
+      const [err] = await to(api.filters.refetch(this.selected));
+      this.refetching = false;
+      // already fetching is fine, the preview shows the progress either way
+      if (err && !(err instanceof HTTPError && err.status === 409)) {
+        this.saveError =
+          this.$t("fail_refetch") +
+          (err instanceof HTTPError ? ` (${err.status} ${err.statusText})` : "");
+        return;
+      }
+      clearTimeout(this.pagesPoll);
+      this.runPreview();
     },
     async deleteFilter() {
       const f = this.filters.find(f => f.id === this.selected);

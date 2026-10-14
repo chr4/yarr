@@ -112,3 +112,40 @@ func TestFetchPageInternalRedirect(t *testing.T) {
 		t.Fatalf("expected a redirect to an internal address to be refused, got %q", page)
 	}
 }
+
+func TestRefetchPages(t *testing.T) {
+	db, err := storage.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := NewWorker(db, client.NewBuilder().Build())
+	feed := db.CreateFeed(model.CreateFeedParams{Title: "feed", FeedLink: "http://example.com/feed.xml"})
+	old := "old page"
+	db.CreateItems([]model.Item{
+		{GUID: "1", FeedId: feed.Id, Title: "one", Link: "http://127.0.0.1/1", Page: &old, Date: time.Now()},
+		{GUID: "2", FeedId: feed.Id, Title: "two", Link: "http://127.0.0.1/2", Page: &old, Date: time.Now()},
+	})
+
+	if w.FetchMissingPages(db, feed.Id) {
+		t.Fatal("expected no pages to be missing")
+	}
+	if !w.RefetchPages(db, feed.Id) {
+		t.Fatal("expected the pages to be fetched again")
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; {
+		if _, ok := w.PagesLeft(feed.Id); !ok {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("fetching the pages did not finish")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// the links cannot be fetched, which replaces the pages with empty ones
+	db.ForEachItem(false, true, func(item model.Item) {
+		if item.Page == nil || *item.Page != "" {
+			t.Errorf("expected the page of %s to be fetched again, got %v", item.Title, item.Page)
+		}
+	})
+}
