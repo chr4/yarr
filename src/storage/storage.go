@@ -12,23 +12,29 @@ type Storage interface {
 	Close() error
 	CountItems() int
 	CreateFeed(params model.CreateFeedParams) *model.Feed
+	CreateFilter(params model.FilterParams) *model.Filter
 	CreateFolder(title string) *model.Folder
 	CreateItems(items []model.Item) bool
 	DeleteFeed(feedId int64) bool
+	DeleteFilter(id int64) bool
 	DeleteFolder(folderId int64) bool
 	DeleteOldItems()
 	FeedStats() []model.FeedStat
+	ForEachItem(withContent bool, fn func(item model.Item)) error
 	GetFeed(id int64) *model.Feed
 	GetFeedState(feedID int64) (*model.FeedState, error)
 	GetItem(id int64) *model.Item
 	GetSettings() model.Settings
 	ListFeedStates() ([]model.FeedState, error)
 	ListFeeds() []model.Feed
+	ListFilters() []model.Filter
 	ListFolders() []model.Folder
 	ListItems(filter model.ItemFilter, limit int, newestFirst bool, withContent bool) []model.Item
 	MarkItemsRead(filter model.MarkFilter) bool
+	SetItemFilters(filterIds map[int64]*int64) bool
 	UpdateFeed(feedId int64, params model.UpdateFeedParams) (bool, error)
 	UpdateFeedState(feedID int64, params model.UpdateFeedStateParams) (bool, error)
+	UpdateFilter(id int64, params model.FilterParams) bool
 	UpdateFolder(folderId int64, params model.UpdateFolderParams) (bool, error)
 	UpdateItem(id int64, params model.UpdateItemParams) bool
 	UpdateSettings(params model.UpdateSettingsParams) bool

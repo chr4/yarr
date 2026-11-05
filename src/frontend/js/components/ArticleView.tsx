@@ -27,6 +27,7 @@ interface ArticleViewProps {
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
   onClose: () => void;
+  onFilterSimilar: () => void;
   contentRef: Ref<HTMLDivElement>;
   language: string;
 }
@@ -50,6 +51,7 @@ export default function ArticleView({
   isFullscreen,
   onToggleFullscreen,
   onClose,
+  onFilterSimilar,
   contentRef,
   language,
 }: ArticleViewProps) {
@@ -171,6 +173,15 @@ export default function ArticleView({
             aria-label={t("open_link")}>
             <Icon name="external-link" />
           </a>
+        </Tooltip>
+        <Tooltip label={t("filter_similar")}>
+          <button
+            type="button"
+            className="c-button-pill"
+            aria-label={t("filter_similar")}
+            onClick={onFilterSimilar}>
+            <Icon name="filter" />
+          </button>
         </Tooltip>
 
         <div className="flex-grow-1" />
