@@ -72,6 +72,7 @@ export default function App() {
   const feeds = useSignal<Feed[]>([]);
   const feedSelected = useSignal<string | null>(appSettings.feed ?? null);
   const feedListWidth = useSignal<number>(appSettings.feed_list_width || 300);
+  const feedListCollapsed = useSignal<boolean>(!!appSettings.feed_list_collapsed);
   const feedErrors = useSignal<Record<number, string>>({});
   const feedStats = useSignal<Record<number, FeedStat>>({});
 
@@ -781,11 +782,18 @@ export default function App() {
       {/* Feed list column */}
       <div
         id="col-feed-list"
-        className="vh-100 position-relative d-flex flex-column border-end flex-shrink-0"
+        className={`vh-100 position-relative d-flex flex-column border-end flex-shrink-0 ${
+          feedListCollapsed.value ? "is-collapsed" : ""
+        }`}
         style={{ width: `${feedListWidth.value}px` }}>
         <Drag width={feedListWidth.value} onResize={resizeFeedList} />
-        <div className="px-2 py-1 d-flex justify-content-between gap-2">
+        <div className="feed-list-header px-2 py-1 d-flex justify-content-between gap-2">
           <DropdownApp
+            sidebarCollapsed={feedListCollapsed.value}
+            onToggleSidebar={() => {
+              feedListCollapsed.value = !feedListCollapsed.value;
+              updateSettings({ feed_list_collapsed: feedListCollapsed.value });
+            }}
             theme={theme.value.name}
             onThemeChange={th => {
               theme.value = { ...theme.value, name: th };
@@ -809,7 +817,7 @@ export default function App() {
               else document.location.reload();
             }}
           />
-          <div class="d-flex flex-row gap-1">
+          <div class="feed-list-filters d-flex flex-row gap-1">
             <Tooltip label={t("unread")}>
               <button
                 type="button"
@@ -861,7 +869,13 @@ export default function App() {
             onRefreshRateChange={changeRefreshRate}
             onFetchAllFeeds={fetchAllFeeds}
             onImportOPML={importOPML}
-            onShowNewFeed={() => (showNewFeed.value = true)}
+            onShowNewFeed={() => {
+              if (feedListCollapsed.value) {
+                feedListCollapsed.value = false;
+                updateSettings({ feed_list_collapsed: false });
+              }
+              showNewFeed.value = true;
+            }}
           />
         </div>
         <div class="d-flex flex-column overflow-auto border-top flex-grow-1">
@@ -898,7 +912,7 @@ export default function App() {
         </div>
 
         {loadingFeeds.value > 0 && (
-          <div className="px-2 py-1 d-flex align-items-center border-top flex-shrink-0">
+          <div className="feed-list-loading px-2 py-1 d-flex align-items-center border-top flex-shrink-0">
             <span className="c-spinner mx-2" />
             <span className="text-truncate cursor-default user-select-none">
               {t("refreshing_progress", { count: loadingFeeds.value })}
