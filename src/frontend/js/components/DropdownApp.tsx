@@ -26,6 +26,8 @@ interface DropdownAppProps {
   onLanguageChange: (lang: Lang) => void;
   requiresAuth: boolean;
   onLogout: () => void;
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
 }
 
 export default function DropdownApp({
@@ -36,6 +38,8 @@ export default function DropdownApp({
   onLanguageChange,
   requiresAuth,
   onLogout,
+  sidebarCollapsed,
+  onToggleSidebar,
 }: DropdownAppProps) {
   const { t } = useI18n();
 
@@ -68,6 +72,13 @@ export default function DropdownApp({
         onClick={onShowShortcuts}>
         <Icon className="me-1" name="help-circle" />
         {t("shortcuts")}
+      </button>
+      <button
+        type="button"
+        className="c-dropdown-item w-100 text-start d-none d-lg-flex gap-1"
+        onClick={onToggleSidebar}>
+        <Icon className="me-1" name={sidebarCollapsed ? "sidebar-open" : "sidebar-close"} />
+        {sidebarCollapsed ? t("expand_sidebar") : t("collapse_sidebar")}
       </button>
 
       <div className="c-dropdown-divider" />
