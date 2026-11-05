@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useCallback } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useMemo, useCallback } from "preact/hooks";
 import { useSignal, useComputed } from "@preact/signals";
 import type { Lang } from "../i18n";
 import { useI18n } from "../i18n";
@@ -95,6 +95,7 @@ export default function App() {
   const itemFullscreen = useSignal(false);
   const itemSearch = useSignal("");
   const itemSortNewestFirst = useSignal<boolean>(appSettings.sort_newest_first ?? true);
+  const markReadOnScroll = useSignal<boolean>(!!appSettings.mark_read_on_scroll);
 
   // Status & modal
   const showModal = useSignal<"" | "shortcuts">("");
@@ -106,9 +107,13 @@ export default function App() {
 
   // Element refs
   const itemListRef = useRef<HTMLDivElement>(null);
+  const itemListSpacerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const menuDropdownRef = useRef<DropdownHandle>(null);
   const activeReqIdRef = useRef(0);
+  const readObserverRef = useRef<IntersectionObserver | null>(null);
+  const observedItemsRef = useRef(new Set<Element>());
+  const seenItemsRef = useRef(new WeakSet<Element>());
 
   // Error helper
   const errDescription = useCallback(
@@ -350,6 +355,45 @@ export default function App() {
     return query;
   }, []);
 
+  const itemListCloseToBottom = () => {
+    const el = itemListRef.current;
+    if (!el || el.scrollHeight === 0) return false; // the list is invisible (responsive design)
+    const scale = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
+    // the room added below the list to scroll the last articles past does not count
+    const spacerHeight = itemListSpacerRef.current?.offsetHeight || 0;
+    return el.scrollHeight - el.scrollTop - el.offsetHeight - spacerHeight < 70 * scale;
+  };
+
+  const itemListScrolledPast = () => {
+    const el = itemListRef.current;
+    const listItems = el?.querySelectorAll(".c-listitem");
+    if (!el || !listItems?.length || !el.clientHeight) return false;
+    const last = listItems[listItems.length - 1];
+    return last.getBoundingClientRect().bottom <= el.getBoundingClientRect().top + el.clientTop;
+  };
+
+  const revealNewItems = async () => {
+    // read articles are kept in the unread view until the list is reloaded.
+    // drop them now, so that only what is left to read is shown
+    if (filterSelected.value === "unread") {
+      const unread = items.value.filter(i => i.status !== "read" || i.id === itemSelected.value);
+      if (unread.length < items.value.length) {
+        items.value = unread;
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    }
+    scrollToFirstUnread();
+  };
+
+  const scrollToFirstUnread = () => {
+    const el = itemListRef.current;
+    const item = items.value.find(i => i.status === "unread");
+    const target = item && el?.querySelector(`[data-id="${item.id}"]`);
+    if (!el || !target) return;
+    const offset = target.getBoundingClientRect().top - el.getBoundingClientRect().top;
+    el.scrollTop += offset - el.clientTop - parseFloat(getComputedStyle(el).paddingTop);
+  };
+
   const refreshItems = useCallback(
     async (loadMore = false) => {
       if (feedSelected.value === null) {
@@ -383,18 +427,16 @@ export default function App() {
         return;
       }
 
+      // the old list is still rendered here. when everything was already scrolled past,
+      // new items would end up out of sight above the viewport
+      const scrolledPast = markReadOnScroll.value && itemListScrolledPast();
       items.value = loadMore ? items.value.concat(data.list) : data.list;
+      if (scrolledPast) setTimeout(revealNewItems, 0);
       itemsHasMore.value = data.has_more;
 
       if (data.has_more && !loadMore) {
         setTimeout(() => {
-          const el = itemListRef.current;
-          if (!el || el.scrollHeight === 0) return;
-          const scale =
-            (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
-          if (el.scrollHeight - el.scrollTop - el.offsetHeight < 70 * scale) {
-            refreshItems(true);
-          }
+          if (itemListCloseToBottom()) refreshItems(true);
         }, 0);
       }
     },
@@ -413,12 +455,9 @@ export default function App() {
 
   const loadMoreItems = useCallback(() => {
     if (!itemsHasMore.value || loadingItems.value) return;
-    const el = itemListRef.current;
-    if (!el || el.scrollHeight === 0) return;
-    const scale = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
-    const closeToBottom = el.scrollHeight - el.scrollTop - el.offsetHeight < 70 * scale;
+    if (!itemListRef.current?.scrollHeight) return; // the list is invisible (responsive design)
     if (
-      closeToBottom ||
+      itemListCloseToBottom() ||
       (itemSelected.value &&
         items.value.length &&
         itemSelected.value === items.value[items.value.length - 1].id)
@@ -511,6 +550,94 @@ export default function App() {
       itemSelectedDetails.value = { ...itemSelectedDetails.value, status: newstatus };
     }
   };
+
+  // Mark read on scroll
+  const markScrolledItemsRead = async (scrolled: Item[]) => {
+    const setStatus = (ids: Set<number>, status: ItemStatus) => {
+      const stats = { ...feedStats.value };
+      for (const item of scrolled) {
+        if (!ids.has(item.id)) continue;
+        const stat = stats[item.feed_id];
+        if (stat) stats[item.feed_id] = { ...stat, unread: stat.unread + (status === "unread" ? 1 : -1) };
+      }
+      feedStats.value = stats;
+      items.value = items.value.map(i => (ids.has(i.id) ? { ...i, status } : i));
+      if (itemSelectedDetails.value && ids.has(itemSelectedDetails.value.id)) {
+        itemSelectedDetails.value = { ...itemSelectedDetails.value, status };
+      }
+    };
+
+    // update optimistically, so that scrolling back and forth does not send duplicate requests
+    setStatus(new Set(scrolled.map(i => i.id)), "read");
+    const results = await Promise.all(
+      scrolled.map(item => to(api.items.update(item.id, { status: "read" }))),
+    );
+
+    const failed = results.findIndex(([err]) => err);
+    if (failed === -1) return;
+    // revert the failed ones, unless their status was changed in the meantime
+    const stillRead = new Set(items.value.filter(i => i.status === "read").map(i => i.id));
+    const revert = scrolled.filter((item, idx) => results[idx][0] && stillRead.has(item.id));
+    setStatus(new Set(revert.map(item => item.id)), "unread");
+    showToast(
+      { title: t("fail_update_article"), description: errDescription(results[failed][0]) },
+      { level: "fail", closeable: false },
+    );
+  };
+
+  const onItemIntersect = (entries: IntersectionObserverEntry[]) => {
+    const seen = seenItemsRef.current;
+    const scrolledOut: Item[] = [];
+    for (const entry of entries) {
+      // removed items are reported as not intersecting anymore
+      if (!entry.target.isConnected) continue;
+      if (entry.isIntersecting) {
+        seen.add(entry.target);
+        continue;
+      }
+      // ignore items that were never on screen (e.g. new items inserted above the viewport)
+      // and the hidden list on small screens
+      if (!seen.has(entry.target) || !entry.rootBounds?.height) continue;
+      // only items that left through the top were scrolled past
+      if (entry.boundingClientRect.bottom > entry.rootBounds.top) continue;
+      seen.delete(entry.target);
+      const id = Number((entry.target as HTMLElement).dataset.id);
+      const item = items.value.find(i => i.id === id);
+      if (item?.status === "unread") scrolledOut.push(item);
+    }
+    if (markReadOnScroll.value && scrolledOut.length) markScrolledItemsRead(scrolledOut);
+  };
+  const onItemIntersectRef = useRef(onItemIntersect);
+  onItemIntersectRef.current = onItemIntersect;
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(entries => onItemIntersectRef.current(entries), {
+      root: itemListRef.current,
+    });
+    readObserverRef.current = observer;
+    return () => observer.disconnect();
+  }, []);
+
+  // observe the rendered list items, before the browser computes the next intersections
+  useLayoutEffect(() => {
+    const observer = readObserverRef.current;
+    const list = itemListRef.current;
+    if (!observer || !list) return;
+    const observed = observedItemsRef.current;
+    const current = new Set(list.querySelectorAll(".c-listitem[data-id]"));
+    for (const el of observed) {
+      if (!current.has(el)) {
+        observer.unobserve(el);
+        observed.delete(el);
+      }
+    }
+    for (const el of current) {
+      if (!observed.has(el)) {
+        observer.observe(el);
+        observed.add(el);
+      }
+    }
+  });
 
   const markItemsRead = async () => {
     const markQuery = getItemsQuery();
@@ -907,6 +1034,11 @@ export default function App() {
             onRefreshRateChange={changeRefreshRate}
             onFetchAllFeeds={fetchAllFeeds}
             onImportOPML={importOPML}
+            markReadOnScroll={markReadOnScroll.value}
+            onToggleMarkReadOnScroll={() => {
+              markReadOnScroll.value = !markReadOnScroll.value;
+              updateSettings({ mark_read_on_scroll: markReadOnScroll.value });
+            }}
             onShowNewFeed={() => {
               if (feedListCollapsed.value) {
                 feedListCollapsed.value = false;
@@ -1054,7 +1186,10 @@ export default function App() {
           {items.value.map(item => (
             <a
               key={item.id}
-              className="c-listitem d-flex flex-column user-select-none"
+              data-id={item.id}
+              className={`c-listitem d-flex flex-column user-select-none ${
+                item.status === "read" ? "is-read" : ""
+              }`}
               href={item.link || undefined}
               target="_blank"
               rel="noopener noreferrer"
@@ -1098,6 +1233,14 @@ export default function App() {
             <div className={`text-center my-3 ${items.value.length === 0 ? "show-delayed" : ""}`}>
               <span className="c-spinner" />
             </div>
+          )}
+          {/* extra room, so that even the last article can be scrolled out of view */}
+          {markReadOnScroll.value && items.value.length > 0 && (
+            <div
+              ref={itemListSpacerRef}
+              className="flex-shrink-0"
+              style={{ flexBasis: "calc(100% + 1rem)" }}
+            />
           )}
         </div>
 

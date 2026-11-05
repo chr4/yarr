@@ -16,6 +16,8 @@ interface DropdownSettingsProps {
   onFetchAllFeeds: () => void;
   onImportOPML: (e: Event) => void;
   onShowNewFeed: () => void;
+  markReadOnScroll: boolean;
+  onToggleMarkReadOnScroll: () => void;
   dropdownRef?: Ref<DropdownHandle>;
 }
 
@@ -28,6 +30,8 @@ export default function DropdownSettings({
   onFetchAllFeeds,
   onImportOPML,
   onShowNewFeed,
+  markReadOnScroll,
+  onToggleMarkReadOnScroll,
   dropdownRef,
 }: DropdownSettingsProps) {
   const { t } = useI18n();
@@ -94,6 +98,19 @@ export default function DropdownSettings({
           </div>
         </>
       )}
+
+      <div className="c-dropdown-divider" />
+      <button
+        type="button"
+        className="c-dropdown-item w-100 text-start d-flex gap-1"
+        aria-pressed={markReadOnScroll}
+        onClick={e => {
+          e.stopPropagation();
+          onToggleMarkReadOnScroll();
+        }}>
+        <Icon className="me-1" name={markReadOnScroll ? "check" : "circle"} />
+        {t("mark_read_on_scroll")}
+      </button>
 
       <div className="c-dropdown-divider" />
       <div className="c-dropdown-header" role="heading" aria-level={2}>
