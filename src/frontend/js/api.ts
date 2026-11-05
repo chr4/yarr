@@ -150,6 +150,9 @@ export default {
     delete(id: number): Promise<Response> {
       return api("delete", `./api/filters/${id}`);
     },
+    refetch(id: number): Promise<Response> {
+      return api("post", `./api/filters/${id}/refetch`);
+    },
     preview(data: FilterParams): Promise<FilterPreviewResponse> {
       return api("post", "./api/filters/preview", { json: data }).then(json<FilterPreviewResponse>);
     },

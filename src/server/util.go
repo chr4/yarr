@@ -16,7 +16,7 @@ func newCrawlClient() *http.Client {
 		if len(via) >= 10 {
 			return fmt.Errorf("stopped after 10 redirects")
 		}
-		if isInternalFromURL(req.URL.String()) {
+		if IsInternalURL(req.URL.String()) {
 			return fmt.Errorf("redirect to internal address %s", req.URL.Host)
 		}
 		return nil
@@ -24,7 +24,8 @@ func newCrawlClient() *http.Client {
 	return httpClient
 }
 
-func isInternalFromURL(urlStr string) bool {
+// IsInternalURL reports whether a URL points at this machine or the local network.
+func IsInternalURL(urlStr string) bool {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return false

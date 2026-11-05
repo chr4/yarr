@@ -79,6 +79,11 @@ type Item struct {
 
 	// id of the filter hiding this item, if any
 	FilterId *int64 `json:"-"`
+
+	// text of the article page, for filters checking it; nil if not fetched
+	Page *string `json:"-"`
+	// the site answered with a captcha instead of the page
+	PageBlocked bool `json:"-"`
 }
 
 type ItemStatus int

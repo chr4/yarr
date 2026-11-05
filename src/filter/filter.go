@@ -1,5 +1,5 @@
-// Package filter hides items whose title or content matches user-defined
-// regular expressions.
+// Package filter hides items whose title, content or article page matches
+// user-defined regular expressions.
 package filter
 
 import (
@@ -18,8 +18,9 @@ import (
 )
 
 var (
-	ErrEmptyPattern = errors.New("pattern is empty")
-	ErrMatchesAll   = errors.New("pattern matches every article")
+	ErrEmptyPattern  = errors.New("pattern is empty")
+	ErrMatchesAll    = errors.New("pattern matches every article")
+	ErrPageNeedsFeed = errors.New("checking the article page needs a single feed")
 )
 
 // Compile returns the regular expression of a filter pattern.
@@ -47,6 +48,7 @@ type rule struct {
 	feedId  *int64
 	re      *regexp.Regexp
 	content bool
+	page    bool
 }
 
 // itemText extracts the text of an item's content at most once.
@@ -77,15 +79,30 @@ func (r *rule) find(item *model.Item, text *itemText) (string, string, []int) {
 			return "content", content, loc
 		}
 	}
+	if r.page && item.Page != nil {
+		if loc := r.re.FindStringIndex(*item.Page); loc != nil {
+			return "page", *item.Page, loc
+		}
+	}
 	return "", "", nil
 }
 
+// Check returns why a filter cannot be used, if it cannot.
+func Check(params model.FilterParams) error {
+	_, err := newRule(0, params)
+	return err
+}
+
 func newRule(id int64, params model.FilterParams) (*rule, error) {
+	// pages are fetched only for the feeds that need them
+	if params.MatchPage && params.FeedId == nil {
+		return nil, ErrPageNeedsFeed
+	}
 	re, err := Compile(params.Pattern, params.CaseSensitive)
 	if err != nil {
 		return nil, err
 	}
-	return &rule{id: id, feedId: params.FeedId, re: re, content: params.MatchContent}, nil
+	return &rule{id: id, feedId: params.FeedId, re: re, content: params.MatchContent, page: params.MatchPage}, nil
 }
 
 // Matcher decides which of the enabled filters hides an item.
@@ -102,6 +119,7 @@ func New(filters []model.Filter) *Matcher {
 		r, err := newRule(f.Id, model.FilterParams{
 			Pattern:       f.Pattern,
 			MatchContent:  f.MatchContent,
+			MatchPage:     f.MatchPage,
 			CaseSensitive: f.CaseSensitive,
 			FeedId:        f.FeedId,
 		})
@@ -117,6 +135,25 @@ func New(filters []model.Filter) *Matcher {
 // NeedsContent reports whether any filter looks at the item content.
 func (m *Matcher) NeedsContent() bool {
 	return slices.ContainsFunc(m.rules, func(r *rule) bool { return r.content })
+}
+
+// NeedsPage reports whether any filter looks at the article page of
+// a feed's items.
+func (m *Matcher) NeedsPage(feedId int64) bool {
+	return slices.ContainsFunc(m.rules, func(r *rule) bool {
+		return r.page && r.feedId != nil && *r.feedId == feedId
+	})
+}
+
+// PageFeeds returns the feeds whose items have their article page checked.
+func (m *Matcher) PageFeeds() []int64 {
+	feeds := make([]int64, 0)
+	for _, r := range m.rules {
+		if r.page && !slices.Contains(feeds, *r.feedId) {
+			feeds = append(feeds, *r.feedId)
+		}
+	}
+	return feeds
 }
 
 // Match returns the id of the first filter hiding the item, or nil.
@@ -147,7 +184,7 @@ func ApplyStored(db storage.Storage, items []model.Item) {
 func Refilter(db storage.Storage) error {
 	m := New(db.ListFilters())
 	changes := make(map[int64]*int64)
-	err := db.ForEachItem(m.NeedsContent(), func(item model.Item) {
+	err := db.ForEachItem(m.NeedsContent(), len(m.PageFeeds()) > 0, func(item model.Item) {
 		filterId := m.Match(item)
 		old := item.FilterId
 		if (old == nil) != (filterId == nil) || (old != nil && *old != *filterId) {
@@ -164,7 +201,7 @@ func Refilter(db storage.Storage) error {
 }
 
 // PreviewMatch is a stored item matched by a filter, with the matched text
-// cut out of the title or a snippet of the content.
+// cut out of the title or a snippet of the content or page.
 type PreviewMatch struct {
 	Id     int64            `json:"id"`
 	FeedId int64            `json:"feed_id"`
@@ -191,7 +228,7 @@ func Preview(db storage.Storage, params model.FilterParams, limit int) (int, []P
 	}
 
 	matches := make([]PreviewMatch, 0)
-	err = db.ForEachItem(r.content, func(item model.Item) {
+	err = db.ForEachItem(r.content, r.page, func(item model.Item) {
 		field, text, loc := r.find(&item, &itemText{item: &item})
 		if field == "" {
 			return
@@ -207,7 +244,7 @@ func Preview(db storage.Storage, params model.FilterParams, limit int) (int, []P
 			Match:  text[loc[0]:loc[1]],
 			After:  text[loc[1]:],
 		}
-		if field == "content" {
+		if field != "title" {
 			match.Before = cutLeft(match.Before, snippetBefore)
 			match.After = cutRight(match.After, snippetAfter)
 		}
