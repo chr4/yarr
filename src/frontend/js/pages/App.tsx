@@ -448,6 +448,13 @@ export default function App() {
     });
   }, [itemSelected.value, t, errDescription]);
 
+  const selectItem = (e: MouseEvent, item: Item) => {
+    // let modifier clicks (ctrl/cmd/shift) open the link natively
+    if (item.link && (e.ctrlKey || e.metaKey || e.shiftKey)) return;
+    e.preventDefault();
+    itemSelected.value = item.id;
+  };
+
   // Status toggle
   const toggleItemStatus = async (item: Item, targetstatus: ItemStatus) => {
     const oldstatus = item.status;
@@ -1000,12 +1007,16 @@ export default function App() {
           className="d-flex flex-column p-2 overflow-auto border-top flex-grow-1 gap-1"
           onScroll={onItemListScroll}>
           {items.value.map(item => (
-            <div
+            <a
               key={item.id}
               className="c-listitem d-flex flex-column user-select-none"
+              href={item.link || undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              draggable={false}
               role="radio"
               aria-checked={itemSelected.value === item.id}
-              onClick={() => (itemSelected.value = item.id)}>
+              onClick={e => selectItem(e, item)}>
               <div
                 style={{ lineHeight: "100%", opacity: 0.7, marginBottom: "0.1rem" }}
                 className="d-flex align-items-center">
@@ -1027,7 +1038,7 @@ export default function App() {
                 </small>
               </div>
               <div className="text-break line-clamp-3">{item.title || t("untitled")}</div>
-            </div>
+            </a>
           ))}
           {(itemsHasMore.value || loadingItems.value) && (
             <div className={`text-center my-3 ${items.value.length === 0 ? "show-delayed" : ""}`}>
