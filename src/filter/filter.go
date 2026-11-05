@@ -1,5 +1,5 @@
-// Package filter hides items whose title, content or article page matches
-// user-defined regular expressions.
+// Package filter hides items whose title, content, article page or link
+// matches user-defined regular expressions.
 package filter
 
 import (
@@ -21,6 +21,7 @@ var (
 	ErrEmptyPattern  = errors.New("pattern is empty")
 	ErrMatchesAll    = errors.New("pattern matches every article")
 	ErrPageNeedsFeed = errors.New("checking the article page needs a single feed")
+	ErrLinkAlone     = errors.New("the link is matched on its own, not with content or page")
 )
 
 // Compile returns the regular expression of a filter pattern.
@@ -49,6 +50,7 @@ type rule struct {
 	re      *regexp.Regexp
 	content bool
 	page    bool
+	link    bool // instead of the title, content and page
 }
 
 // itemText extracts the text of an item's content at most once.
@@ -68,6 +70,12 @@ func (t *itemText) content() string {
 // find returns the field and text the rule matched in, and the match location.
 func (r *rule) find(item *model.Item, text *itemText) (string, string, []int) {
 	if r.feedId != nil && *r.feedId != item.FeedId {
+		return "", "", nil
+	}
+	if r.link {
+		if loc := r.re.FindStringIndex(item.Link); loc != nil {
+			return "link", item.Link, loc
+		}
 		return "", "", nil
 	}
 	if loc := r.re.FindStringIndex(item.Title); loc != nil {
@@ -98,11 +106,22 @@ func newRule(id int64, params model.FilterParams) (*rule, error) {
 	if params.MatchPage && params.FeedId == nil {
 		return nil, ErrPageNeedsFeed
 	}
+	// a pattern for a link would hardly make sense for the title
+	if params.MatchLink && (params.MatchContent || params.MatchPage) {
+		return nil, ErrLinkAlone
+	}
 	re, err := Compile(params.Pattern, params.CaseSensitive)
 	if err != nil {
 		return nil, err
 	}
-	return &rule{id: id, feedId: params.FeedId, re: re, content: params.MatchContent, page: params.MatchPage}, nil
+	return &rule{
+		id:      id,
+		feedId:  params.FeedId,
+		re:      re,
+		content: params.MatchContent,
+		page:    params.MatchPage,
+		link:    params.MatchLink,
+	}, nil
 }
 
 // Matcher decides which of the enabled filters hides an item.
@@ -120,6 +139,7 @@ func New(filters []model.Filter) *Matcher {
 			Pattern:       f.Pattern,
 			MatchContent:  f.MatchContent,
 			MatchPage:     f.MatchPage,
+			MatchLink:     f.MatchLink,
 			CaseSensitive: f.CaseSensitive,
 			FeedId:        f.FeedId,
 		})
@@ -201,7 +221,7 @@ func Refilter(db storage.Storage) error {
 }
 
 // PreviewMatch is a stored item matched by a filter, with the matched text
-// cut out of the title or a snippet of the content or page.
+// cut out of the title or a snippet of the content, page or link.
 type PreviewMatch struct {
 	Id     int64            `json:"id"`
 	FeedId int64            `json:"feed_id"`
