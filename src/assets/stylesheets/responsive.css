@@ -87,3 +87,26 @@
   display: flex !important;
   width: 100% !important;
 }
+
+/* collapsed feed list (desktop only) */
+
+@media (min-width: 992px) {
+  #app #col-feed-list.is-collapsed {
+    width: calc(3rem + 1px) !important;
+  }
+  #col-feed-list.is-collapsed .feed-list-header,
+  #col-feed-list.is-collapsed .feed-list-filters {
+    flex-direction: column !important;
+    align-items: center;
+    gap: 0.25rem !important;
+  }
+  #col-feed-list.is-collapsed .c-dropdown {
+    right: auto !important;
+    left: 0 !important;
+  }
+  #col-feed-list.is-collapsed #feed-list-scroll > *,
+  #col-feed-list.is-collapsed .feed-list-loading > :not(.c-spinner),
+  #col-feed-list.is-collapsed .drag {
+    display: none !important;
+  }
+}

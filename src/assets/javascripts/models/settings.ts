@@ -15,6 +15,7 @@ export const SettingsModel = createModel(
       filter: signal<Filter>((initial.filter as Filter) || ""),
       feed: signal<string | null>(initial.feed ?? null),
       feed_list_width: signal<number>(initial.feed_list_width || 300),
+      feed_list_collapsed: signal<boolean>(!!initial.feed_list_collapsed),
       item_list_width: signal<number>(initial.item_list_width || 300),
       sort_newest_first: signal<boolean>(initial.sort_newest_first ?? true),
       theme_name: signal<Theme>((initial.theme_name as Theme) || "system"),
