@@ -15,7 +15,7 @@ import FeedTree from "../components/FeedTree";
 import NewFeed from "../components/NewFeed";
 import ToastContainer, { showToast } from "../components/Toast";
 import DropdownSettings, { Theme } from "../components/DropdownSettings";
-import DropdownApp from "../components/DropdownApp";
+import DropdownApp, { UI_SIZE_MIN, UI_SIZE_MAX } from "../components/DropdownApp";
 import DropdownFeed from "../components/DropdownFeed";
 import DropdownFolder from "../components/DropdownFolder";
 import ArticleView, { ThemeFont } from "../components/ArticleView";
@@ -72,6 +72,7 @@ export default function App() {
     font: (appSettings.theme_font as ThemeFont) || "",
     size: (appSettings.theme_size as number) || 1,
   });
+  const uiSize = useSignal<number>((appSettings.ui_size as number) || 1);
   const refreshRate = useSignal<number>(appSettings.refresh_rate || 0);
   const language = useSignal<Lang>(appSettings.language || "en");
 
@@ -828,6 +829,13 @@ export default function App() {
             onThemeChange={th => {
               theme.value = { ...theme.value, name: th };
               updateSettings({ theme_name: th });
+            }}
+            uiSize={uiSize.value}
+            onUISizeChange={delta => {
+              const size = +(uiSize.value + 0.1 * delta).toFixed(1);
+              uiSize.value = Math.min(Math.max(UI_SIZE_MIN, size), UI_SIZE_MAX);
+              document.documentElement.style.setProperty("--v-ui-scale", String(uiSize.value));
+              updateSettings({ ui_size: uiSize.value });
             }}
             onShowShortcuts={() => (showModal.value = "shortcuts")}
             language={language.value}
