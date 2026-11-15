@@ -96,6 +96,10 @@ export default function App() {
       ),
   );
 
+  // the feed list is collapsed only in the desktop layout
+  const feedListShownCollapsed = () =>
+    settings.values.feed_list_collapsed.value && window.matchMedia("(min-width: 992px)").matches;
+
   // Theme meta tag
   const updateMetaTheme = useCallback((themeName: Theme) => {
     let active = themeName;
@@ -558,7 +562,8 @@ export default function App() {
         { level: "fail" },
       );
     else {
-      settings.values.feed.value = null;
+      // the collapsed feed list has no way to pick another feed, show all of them instead
+      settings.values.feed.value = feedListShownCollapsed() ? "" : null;
       refreshStats();
       refreshFeeds();
     }
@@ -589,7 +594,8 @@ export default function App() {
         { level: "fail" },
       );
     else {
-      settings.values.feed.value = null;
+      // the collapsed feed list has no way to pick another feed, show all of them instead
+      settings.values.feed.value = feedListShownCollapsed() ? "" : null;
       refreshStats();
       refreshFeeds();
     }
@@ -810,7 +816,7 @@ export default function App() {
             onFetchAllFeeds={fetchAllFeeds}
             onImportOPML={importOPML}
             onShowNewFeed={() => {
-              if (settings.values.feed_list_collapsed.value) {
+              if (feedListShownCollapsed()) {
                 settings.update({ feed_list_collapsed: false });
               }
               showNewFeed.value = true;
@@ -819,7 +825,7 @@ export default function App() {
         </div>
         <div class="d-flex flex-column overflow-auto border-top flex-grow-1">
           {showNewFeed.value && (
-            <div className="px-2 py-3 overflow-auto flex-shrink-0 border-bottom">
+            <div className="feed-list-new-feed px-2 py-3 overflow-auto flex-shrink-0 border-bottom">
               <NewFeed
                 folderId={currentFeed.value?.folder_id ?? currentFolder.value?.id ?? null}
                 onCancel={() => (showNewFeed.value = false)}

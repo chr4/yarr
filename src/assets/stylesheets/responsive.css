@@ -105,6 +105,7 @@
     left: 0 !important;
   }
   #col-feed-list.is-collapsed #feed-list-scroll > *,
+  #col-feed-list.is-collapsed .feed-list-new-feed,
   #col-feed-list.is-collapsed .feed-list-loading > :not(.c-spinner) {
     display: none !important;
   }
