@@ -1,5 +1,5 @@
 import { useSignal } from "@preact/signals";
-import { useRef } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 
 interface DragProps {
   onResize: (width: number) => void;
@@ -28,12 +28,21 @@ export default function Drag({ onResize, onReset }: DragProps) {
     onResize(Math.round(initW.current + e.clientX - startX.current));
   };
 
-  const onPointerUp = (e: PointerEvent) => {
+  const end = () => {
     if (!active.value) return;
     active.value = false;
     document.body.classList.remove("is-resizing");
+  };
+
+  const onPointerUp = (e: PointerEvent) => {
+    if (!active.value) return;
+    end();
     (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
   };
+
+  // the capture can also be lost without a pointerup, e.g. when the handle gets hidden
+  // (smaller window) or removed while dragging
+  useEffect(() => () => document.body.classList.remove("is-resizing"), []);
 
   return (
     <div
@@ -42,6 +51,7 @@ export default function Drag({ onResize, onReset }: DragProps) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      onLostPointerCapture={end}
       onDblClick={onReset}
     />
   );
