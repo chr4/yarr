@@ -507,8 +507,11 @@ export default function App() {
     // keep the scroll position, so that the entries below the new items move down. browsers with
     // scroll anchoring would keep them in place instead and move the new items out of sight
     const scrollTop = el.scrollTop;
+    // when everything was already scrolled past, the new items would end up out of sight
+    const scrolledPast = settings.values.mark_read_on_scroll.value && itemListScrolledPast();
     items.value = items.value.concat(insert).sort(compareItems);
     setTimeout(() => (el.scrollTop = scrollTop), 0);
+    if (scrolledPast) setTimeout(() => revealNewItems(insert), 0);
   };
 
   const showPendingItems = async () => {
