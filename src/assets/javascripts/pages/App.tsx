@@ -866,12 +866,13 @@ export default function App() {
             />
           </div>
 
-          {unreadCount.value > 0 && (
+          {/* not in the starred view, where the list is not about what is left to read */}
+          {unreadCount.value > 0 && settings.values.filter.value !== "starred" && (
             <Tooltip label={t("unread_count", { count: unreadCount.value })}>
-              <span className="flex-shrink-0 d-flex align-items-center gap-1 px-1 small opacity-75 user-select-none">
+              <small className="flex-shrink-0 d-flex align-items-center gap-1 opacity-75 user-select-none">
                 <Icon small name="circle-full" />
                 {unreadCount.value}
-              </span>
+              </small>
             </Tooltip>
           )}
 

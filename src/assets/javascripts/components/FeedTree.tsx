@@ -59,9 +59,12 @@ export default function FeedTree({
         ? t("all_starred")
         : t("all_feeds");
 
-  // the unread count in the "all" view, where feeds without unread articles are shown too
-  const count = (stat?: { unread: number; starred: number }) =>
-    filter.value ? stat?.[filter.value] : stat?.unread || "";
+  // the unread count in the "all" view, where feeds without unread articles are shown too.
+  // nothing is shown for none, so that the title keeps the room
+  const count = (stat?: { unread: number; starred: number }) => {
+    const n = filter.value ? stat?.[filter.value] : stat?.unread;
+    return n ? <span className="ps-2 text-end opacity-50">{n}</span> : null;
+  };
 
   return (
     <div ref={refRoot} className="d-flex flex-column gap-1">
@@ -75,9 +78,7 @@ export default function FeedTree({
           <Icon name="layers" />
         </div>
         <div className="flex-grow-1 min-w-0 text-truncate">{allTitle}</div>
-        <div className="flex-shrink-0">
-          <span className="ps-2 text-end opacity-50">{count(stats.total)}</span>
-        </div>
+        <div className="flex-shrink-0">{count(stats.total)}</div>
       </div>
 
       {tree.map(node => {
@@ -103,11 +104,7 @@ export default function FeedTree({
                   </div>
                 </div>
                 <div className="flex-grow-1 min-w-0 text-truncate">{node.folder.title}</div>
-                <div className="flex-shrink-0">
-                  <span className="ps-2 text-end opacity-50">
-                    {count(stats.folders[node.folder.id])}
-                  </span>
-                </div>
+                <div className="flex-shrink-0">{count(stats.folders[node.folder.id])}</div>
               </div>
               {node.folder.is_expanded && node.feeds.length > 0 && (
                 <div className="d-flex flex-column gap-1 ps-3 pt-1">
@@ -133,10 +130,8 @@ export default function FeedTree({
                         <div className="flex-grow-1 min-w-0 text-truncate">
                           {feedNode.feed.title}
                         </div>
-                        <div className="flex-shrink-0 d-flex">
-                          <span className="ps-2 text-end opacity-50">
-                            {count(stats.feeds[feedNode.feed.id])}
-                          </span>
+                        <div className="flex-shrink-0 d-flex gap-1">
+                          {count(stats.feeds[feedNode.feed.id])}
                           {!filter.value && feedErrors[feedNode.feed.id] && (
                             <Icon
                               className="flex-shrink-0"
@@ -173,8 +168,8 @@ export default function FeedTree({
               )}
             </div>
             <div className="flex-grow-1 min-w-0 text-truncate">{node.feed.title}</div>
-            <div className="flex-shrink-0 d-flex">
-              <span className="ps-2 text-end opacity-50">{count(stats.feeds[node.feed.id])}</span>
+            <div className="flex-shrink-0 d-flex gap-1">
+              {count(stats.feeds[node.feed.id])}
               {!filter.value && feedErrors[node.feed.id] && (
                 <Icon
                   className="flex-shrink-0"
