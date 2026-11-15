@@ -36,9 +36,17 @@ const TITLE = document.title;
 
 // room kept for the article view when resizing the feed and item lists
 const MIN_ARTICLE_WIDTH = 300;
+// the feed list header (menus and filters) needs this much
+const MIN_FEED_LIST_WIDTH = 200;
+const MIN_ITEM_LIST_WIDTH = 200;
 
-function clampColumnWidth(width: number, min: number, otherColumnWidth: number): number {
-  const max = Math.max(min, window.innerWidth - otherColumnWidth - MIN_ARTICLE_WIDTH);
+function clampColumnWidth(
+  width: number,
+  min: number,
+  otherColumnWidth: number,
+  windowWidth = window.innerWidth,
+): number {
+  const max = Math.max(min, windowWidth - otherColumnWidth - MIN_ARTICLE_WIDTH);
   return Math.min(Math.max(min, width), max);
 }
 
@@ -124,6 +132,25 @@ export default function App() {
     setLang(settings.values.language.value);
   }, [settings.values.language.value, setLang]);
 
+  // the widths as shown: in a smaller window than they were set in, they leave room for the article
+  const windowWidth = useSignal(window.innerWidth);
+  const feedListShownWidth = useComputed(() =>
+    clampColumnWidth(
+      settings.values.feed_list_width.value,
+      MIN_FEED_LIST_WIDTH,
+      MIN_ITEM_LIST_WIDTH,
+      windowWidth.value,
+    ),
+  );
+  const itemListShownWidth = useComputed(() =>
+    clampColumnWidth(
+      settings.values.item_list_width.value,
+      MIN_ITEM_LIST_WIDTH,
+      settings.values.feed_list_collapsed.value ? 0 : feedListShownWidth.value,
+      windowWidth.value,
+    ),
+  );
+
   const setFeedListCollapsed = (collapsed: boolean) => {
     if (settings.values.feed_list_collapsed.value === collapsed) return;
     settings.update({ feed_list_collapsed: collapsed });
@@ -134,9 +161,15 @@ export default function App() {
     setFeedListCollapsed(w < 100);
     if (settings.values.feed_list_collapsed.value) return;
     settings.update({
-      feed_list_width: clampColumnWidth(w, 150, settings.values.item_list_width.value),
+      feed_list_width: clampColumnWidth(w, MIN_FEED_LIST_WIDTH, itemListShownWidth.value),
     });
   };
+
+  useEffect(() => {
+    const onResize = () => (windowWidth.value = window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const resetFeedList = () => {
     setFeedListCollapsed(false);
@@ -144,10 +177,8 @@ export default function App() {
   };
 
   const resizeItemList = (w: number) => {
-    const feedListSpace = settings.values.feed_list_collapsed.value
-      ? 0
-      : settings.values.feed_list_width.value;
-    settings.update({ item_list_width: clampColumnWidth(w, 200, feedListSpace) });
+    const feedListSpace = settings.values.feed_list_collapsed.value ? 0 : feedListShownWidth.value;
+    settings.update({ item_list_width: clampColumnWidth(w, MIN_ITEM_LIST_WIDTH, feedListSpace) });
   };
 
   // Computed signals
@@ -752,7 +783,7 @@ export default function App() {
         className={`vh-100 position-relative d-flex flex-column border-end flex-shrink-0 ${
           settings.values.feed_list_collapsed.value ? "is-collapsed" : ""
         }`}
-        style={{ width: `${settings.values.feed_list_width.value}px` }}>
+        style={{ width: `${feedListShownWidth.value}px` }}>
         <Drag onResize={resizeFeedList} onReset={resetFeedList} />
         <div className="feed-list-header px-2 py-1 d-flex justify-content-between gap-2">
           <DropdownApp
@@ -866,7 +897,7 @@ export default function App() {
       <div
         id="col-item-list"
         className="vh-100 position-relative d-flex flex-column border-end flex-shrink-0"
-        style={{ width: `${settings.values.item_list_width.value}px` }}>
+        style={{ width: `${itemListShownWidth.value}px` }}>
         <Drag onResize={resizeItemList} onReset={() => resizeItemList(300)} />
         <div className="px-2 py-1 d-flex gap-1 align-items-center">
           <Tooltip label={t("show_feeds")}>
