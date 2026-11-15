@@ -168,11 +168,11 @@ func TestItemPages(t *testing.T) {
 		}
 
 		pages := make(map[string]*string)
-		db.ForEachItem(false, true, func(item model.Item) { pages[item.Title] = item.Page })
+		db.ForEachItem(nil, false, true, func(item model.Item) { pages[item.Title] = item.Page })
 		if pages["one"] == nil || *pages["one"] != paywalled || pages["two"] == nil || *pages["two"] != "" {
 			t.Fatalf("invalid pages: %v", pages)
 		}
-		db.ForEachItem(false, false, func(item model.Item) {
+		db.ForEachItem(nil, false, false, func(item model.Item) {
 			if item.Page != nil {
 				t.Fatalf("expected no page without asking, got %q", *item.Page)
 			}
@@ -201,7 +201,7 @@ func TestItemPages(t *testing.T) {
 		db.DeleteFilter(f.Id)
 		db.DeleteFeed(feed.Id)
 		count := 0
-		db.ForEachItem(false, true, func(model.Item) { count++ })
+		db.ForEachItem(nil, false, true, func(model.Item) { count++ })
 		if count != 0 {
 			t.Fatalf("expected no items left, got %d", count)
 		}

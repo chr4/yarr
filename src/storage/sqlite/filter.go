@@ -101,7 +101,8 @@ func (s *SQLiteStorage) DeleteFilter(id int64) bool {
 	return err == nil
 }
 
-func (s *SQLiteStorage) ForEachItem(withContent, withPage bool, fn func(item model.Item)) error {
+// ForEachItem calls fn with every item, or every item of a feed.
+func (s *SQLiteStorage) ForEachItem(feedId *int64, withContent, withPage bool, fn func(item model.Item)) error {
 	content := "''"
 	if withContent {
 		content = "i.content"
@@ -111,10 +112,11 @@ func (s *SQLiteStorage) ForEachItem(withContent, withPage bool, fn func(item mod
 		page = "p.content"
 	}
 	rows, err := s.db.Query(`
-		select i.id, i.feed_id, i.title, i.date, i.status, i.filter_id, ` + content + `, ` + page + `
+		select i.id, i.feed_id, i.title, i.date, i.status, i.filter_id, `+content+`, `+page+`
 		from items i
 		left join item_pages p on p.item_id = i.id
-	`)
+		where :feed_id is null or i.feed_id = :feed_id
+	`, sql.Named("feed_id", feedId))
 	if err != nil {
 		return err
 	}

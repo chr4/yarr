@@ -21,7 +21,7 @@ type Storage interface {
 	DeleteFolder(folderId int64) bool
 	DeleteOldItems()
 	FeedStats() []model.FeedStat
-	ForEachItem(withContent, withPage bool, fn func(item model.Item)) error
+	ForEachItem(feedId *int64, withContent, withPage bool, fn func(item model.Item)) error
 	GetFeed(id int64) *model.Feed
 	GetFeedState(feedID int64) (*model.FeedState, error)
 	GetItem(id int64) *model.Item

@@ -1,12 +1,15 @@
 package worker
 
 import (
+	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/nkanaev/yarr/src/client"
 	"github.com/nkanaev/yarr/src/storage"
@@ -114,17 +117,38 @@ func TestFetchPageInternalRedirect(t *testing.T) {
 	}
 }
 
+// clientTo returns a client sending every request to the test server, for links that are not
+// internal addresses
+func clientTo(srv *httptest.Server) *http.Client {
+	addr := srv.Listener.Addr().String()
+	return &http.Client{Transport: &http.Transport{
+		DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, addr)
+		},
+	}}
+}
+
 func TestRefetchPages(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/1" {
+			w.Header().Set("Content-Type", "text/html")
+			w.Write([]byte("<p>new page</p>"))
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
 	db, err := storage.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	w := NewWorker(db, client.NewBuilder().Build())
+	w := NewWorker(db, clientTo(srv))
 	feed := db.CreateFeed(model.CreateFeedParams{Title: "feed", FeedLink: "http://example.com/feed.xml"})
 	old := "old page"
 	db.CreateItems([]model.Item{
-		{GUID: "1", FeedId: feed.Id, Title: "one", Link: "http://127.0.0.1/1", Page: &old, Date: time.Now()},
-		{GUID: "2", FeedId: feed.Id, Title: "two", Link: "http://127.0.0.1/2", Page: &old, Date: time.Now()},
+		{GUID: "1", FeedId: feed.Id, Title: "one", Link: "http://news.example/1", Page: &old, Date: time.Now()},
+		{GUID: "2", FeedId: feed.Id, Title: "two", Link: "http://news.example/2", Page: &old, Date: time.Now()},
 	})
 
 	if w.FetchMissingPages(db, feed.Id) {
@@ -143,12 +167,46 @@ func TestRefetchPages(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	// the links cannot be fetched, which replaces the pages with empty ones
-	db.ForEachItem(false, true, func(item model.Item) {
-		if item.Page == nil || *item.Page != "" {
-			t.Errorf("expected the page of %s to be fetched again, got %v", item.Title, item.Page)
+	// the page fetched again replaces the old one, the one failing to fetch is kept
+	want := map[string]string{"one": "new page", "two": "old page"}
+	db.ForEachItem(nil, false, true, func(item model.Item) {
+		if item.Page == nil || !strings.Contains(*item.Page, want[item.Title]) {
+			t.Errorf("expected the page of %s to hold %q, got %v", item.Title, want[item.Title], item.Page)
 		}
 	})
+}
+
+func TestFetchPageCleansUp(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/nul":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Write([]byte("<p>a\x00b \xff</p>"))
+		case "/pdf":
+			w.Header().Set("Content-Type", "application/pdf")
+			w.Write([]byte("%PDF-1.4 \x00\x01"))
+		}
+	}))
+	defer srv.Close()
+	w := NewWorker(nil, clientTo(srv))
+
+	// postgres stores neither NUL characters nor invalid UTF-8
+	page, err := w.FetchPage("http://news.example/nul")
+	if err != nil || strings.Contains(page, "\x00") || !utf8.ValidString(page) {
+		t.Errorf("expected a page without NUL characters and valid UTF-8, got %q, %v", page, err)
+	}
+	if _, err := w.FetchPage("http://news.example/pdf"); err == nil {
+		t.Error("expected anything but web pages to be refused")
+	}
+}
+
+func TestOrdinaryPageIsNoChallenge(t *testing.T) {
+	// Cloudflare adds its challenge platform script to the pages of sites detecting bots
+	body := `<html><body><article>Text</article>` +
+		`<script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script></body></html>`
+	if isChallenge(&http.Response{StatusCode: 200, Header: http.Header{}}, body) {
+		t.Error("an ordinary page with Cloudflare's bot detection script is no challenge")
+	}
 }
 
 func TestFetchPageChallenge(t *testing.T) {

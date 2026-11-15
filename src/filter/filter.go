@@ -182,9 +182,19 @@ func ApplyStored(db storage.Storage, items []model.Item) {
 // Refilter re-evaluates which filter hides each stored item.
 // Called whenever the filters change.
 func Refilter(db storage.Storage) error {
+	return refilter(db, nil)
+}
+
+// RefilterFeed re-evaluates which filter hides each stored item of a feed,
+// e.g. as the article pages of its items arrive.
+func RefilterFeed(db storage.Storage, feedId int64) error {
+	return refilter(db, &feedId)
+}
+
+func refilter(db storage.Storage, feedId *int64) error {
 	m := New(db.ListFilters())
 	changes := make(map[int64]*int64)
-	err := db.ForEachItem(m.NeedsContent(), len(m.PageFeeds()) > 0, func(item model.Item) {
+	err := db.ForEachItem(feedId, m.NeedsContent(), len(m.PageFeeds()) > 0, func(item model.Item) {
 		filterId := m.Match(item)
 		old := item.FilterId
 		if (old == nil) != (filterId == nil) || (old != nil && *old != *filterId) {
@@ -228,7 +238,8 @@ func Preview(db storage.Storage, params model.FilterParams, limit int) (int, []P
 	}
 
 	matches := make([]PreviewMatch, 0)
-	err = db.ForEachItem(r.content, r.page, func(item model.Item) {
+	// a filter for a single feed can only match the items of that feed
+	err = db.ForEachItem(params.FeedId, r.content, r.page, func(item model.Item) {
 		field, text, loc := r.find(&item, &itemText{item: &item})
 		if field == "" {
 			return

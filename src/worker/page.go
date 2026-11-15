@@ -72,6 +72,11 @@ func (w *Worker) fetchPage(url string, internal func(url string) bool) (string, 
 	}
 	defer res.Body.Close()
 
+	// e.g. a link to a PDF, which would only be binary noise to match against
+	if ct := res.Header.Get("Content-Type"); ct != "" && !strings.Contains(strings.ToLower(ct), "html") {
+		return "", fmt.Errorf("not a web page: %s", ct)
+	}
+
 	r, err := charset.NewReader(io.LimitReader(res.Body, pageMaxSize), res.Header.Get("Content-Type"))
 	if err != nil {
 		return "", err
@@ -84,6 +89,9 @@ func (w *Worker) fetchPage(url string, internal func(url string) bool) (string, 
 	if isChallenge(res, string(body)) {
 		return "", ErrBlocked
 	}
+	if res.StatusCode >= 500 {
+		return "", fmt.Errorf("server error: %s", res.Status)
+	}
 	// error pages are kept as well: a paywall may well answer with 402 or 403
 	return ReducePage(strings.NewReader(string(body))), nil
 }
@@ -93,16 +101,14 @@ func (w *Worker) fetchPage(url string, internal func(url string) bool) (string, 
 var ErrBlocked = errors.New("blocked by a captcha")
 
 // markers of the pages bot protection services answer with instead of the
-// page asked for. A heuristic: unknown services go unnoticed.
+// page asked for, and of captcha widgets. A heuristic: unknown services go
+// unnoticed. They also show on ordinary pages (Cloudflare adds its challenge
+// platform script to the pages of sites detecting bots, captchas protect
+// comment forms), so that they only count on error pages.
 var challengeMarkers = []string{
 	"/cdn-cgi/challenge-platform/", // Cloudflare
 	"captcha-delivery.com",         // DataDome
 	"px-captcha",                   // PerimeterX
-}
-
-// captcha widgets, which also show on article pages, e.g. for comments,
-// so that they only count on error pages
-var captchaMarkers = []string{
 	"google.com/recaptcha",
 	"hcaptcha.com",
 	"challenges.cloudflare.com/turnstile",
@@ -112,15 +118,10 @@ func isChallenge(res *http.Response, body string) bool {
 	if res.Header.Get("Cf-Mitigated") == "challenge" {
 		return true
 	}
-	for _, marker := range challengeMarkers {
-		if strings.Contains(body, marker) {
-			return true
-		}
-	}
 	if res.StatusCode < 400 {
 		return false
 	}
-	for _, marker := range captchaMarkers {
+	for _, marker := range challengeMarkers {
 		if strings.Contains(body, marker) {
 			return true
 		}
@@ -175,7 +176,8 @@ func ReducePage(r io.Reader) string {
 			b.WriteString(strings.Join(strings.Fields(string(z.Raw())), " "))
 		}
 	}
-	return strings.TrimSpace(b.String())
+	// postgres stores neither NUL characters nor invalid UTF-8 as text
+	return strings.ToValidUTF8(strings.ReplaceAll(strings.TrimSpace(b.String()), "\x00", ""), "\uFFFD")
 }
 
 // isStructuredData reports whether the current script tag holds JSON-LD.
@@ -199,25 +201,35 @@ func (w *Worker) fetchNewPages(db storage.Storage, feed model.Feed, items []mode
 		return
 	}
 	known := db.ListItemGUIDs(feed.Id)
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, pageFetchers)
 	for i := range items {
 		if known[items[i].GUID] {
 			continue
 		}
-		page := w.fetchPageOrEmpty(items[i].Link)
-		items[i].Page = &page.Content
-		items[i].PageBlocked = page.Blocked
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer wg.Done()
+			page, _ := w.fetchPageOrEmpty(items[i].Link)
+			items[i].Page = &page.Content
+			items[i].PageBlocked = page.Blocked
+			<-sem
+		}()
 	}
+	wg.Wait()
 }
 
 // fetchPageOrEmpty returns an empty page when fetching fails, which is
 // stored like any other, so that a broken link is not fetched again and again.
 // Pages behind a captcha are marked so, to tell why they cannot be checked.
-func (w *Worker) fetchPageOrEmpty(url string) model.ItemPage {
+// It reports whether the page was fetched.
+func (w *Worker) fetchPageOrEmpty(url string) (model.ItemPage, bool) {
 	page, err := w.FetchPage(url)
 	if err != nil {
 		log.Printf("failed to fetch page %s: %s", url, err)
 	}
-	return model.ItemPage{Content: page, Blocked: errors.Is(err, ErrBlocked)}
+	return model.ItemPage{Content: page, Blocked: errors.Is(err, ErrBlocked)}, err == nil
 }
 
 // feeds whose pages are being fetched, with the number of pages left
@@ -278,6 +290,7 @@ func (w *Worker) fetchPages(db storage.Storage, feedId int64, onlyMissing bool) 
 		for start := 0; start < len(items); start += pageBatchSize {
 			batch := items[start:min(start+pageBatchSize, len(items))]
 			pages := make([]model.ItemPage, len(batch))
+			fetched := make([]bool, len(batch))
 			var wg sync.WaitGroup
 			sem := make(chan struct{}, pageFetchers)
 			for i, item := range batch {
@@ -285,7 +298,7 @@ func (w *Worker) fetchPages(db storage.Storage, feedId int64, onlyMissing bool) 
 				sem <- struct{}{}
 				go func() {
 					defer wg.Done()
-					pages[i] = w.fetchPageOrEmpty(item.Link)
+					pages[i], fetched[i] = w.fetchPageOrEmpty(item.Link)
 					<-sem
 				}()
 			}
@@ -293,12 +306,16 @@ func (w *Worker) fetchPages(db storage.Storage, feedId int64, onlyMissing bool) 
 
 			stored := make(map[int64]model.ItemPage, len(batch))
 			for i, item := range batch {
-				stored[item.Id] = pages[i]
+				// fetched again, a page is kept unless the new one could be fetched, so that
+				// the site being down or blocking for a while does not unhide its items
+				if fetched[i] || onlyMissing {
+					stored[item.Id] = pages[i]
+				}
 			}
 			if !db.SetItemPages(stored) {
 				return
 			}
-			if err := filter.Refilter(db); err != nil {
+			if err := filter.RefilterFeed(db, feedId); err != nil {
 				log.Print(err)
 			}
 			pageJobs.Lock()
