@@ -173,6 +173,18 @@ type Settings struct {
 	Language        string  `json:"language"`
 }
 
+// interface sizes offered, as a factor of the default size
+const (
+	UISizeMin = 0.8
+	UISizeMax = 1.6
+)
+
+// ValidUISize reports whether the interface size is one offered, which also
+// rules out NaN.
+func ValidUISize(size float64) bool {
+	return size >= UISizeMin && size <= UISizeMax
+}
+
 type UpdateSettingsParams struct {
 	Filter          *string  `json:"filter"`
 	Feed            *string  `json:"feed"`

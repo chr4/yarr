@@ -12,6 +12,11 @@ export type ThemeFont = "" | "serif" | "monospace";
 export const UI_SIZE_MIN = 0.8;
 export const UI_SIZE_MAX = 1.6;
 
+// the stored interface size, or the default for anything out of range
+export function validUISize(size: unknown): number {
+  return typeof size === "number" && size >= UI_SIZE_MIN && size <= UI_SIZE_MAX ? size : 1;
+}
+
 export const SettingsModel = createModel(
   (initial: Partial<Settings> = {}, onSaveError?: (err: unknown) => void) => {
     const values = {
@@ -23,7 +28,7 @@ export const SettingsModel = createModel(
       theme_name: signal<Theme>((initial.theme_name as Theme) || "system"),
       theme_font: signal<ThemeFont>((initial.theme_font as ThemeFont) || ""),
       theme_size: signal<number>(initial.theme_size || 1),
-      ui_size: signal<number>(initial.ui_size || 1),
+      ui_size: signal<number>(validUISize(initial.ui_size)),
       refresh_rate: signal<number>(initial.refresh_rate || 0),
       language: signal<Lang>((initial.language as Lang) || "en"),
     } satisfies Record<keyof SettingsUpdateData, Signal<unknown>>;

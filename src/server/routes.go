@@ -85,10 +85,14 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	settings := s.db(r).GetSettings()
+	if !model.ValidUISize(settings.UISize) {
+		settings.UISize = 1
+	}
 	if !isAuthenticated {
 		settings = model.Settings{
 			Language:  settings.Language,
 			ThemeName: settings.ThemeName,
+			UISize:    settings.UISize,
 		}
 	}
 
@@ -405,6 +409,10 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPut:
 		var params model.UpdateSettingsParams
 		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if params.UISize != nil && !model.ValidUISize(*params.UISize) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
