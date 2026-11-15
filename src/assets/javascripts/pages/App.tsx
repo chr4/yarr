@@ -204,10 +204,13 @@ export default function App() {
   }, [t, errDescription]);
 
   const refreshStats = useCallback(
-    async () => {
+    // polling in the background fails quietly, instead of telling every 30s while offline
+    async (quiet = false) => {
       const [err, data] = await to(api.status());
       if (err) {
-        showToast({ title: t("fail_load"), description: errDescription(err) }, { level: "fail" });
+        if (!quiet) {
+          showToast({ title: t("fail_load"), description: errDescription(err) }, { level: "fail" });
+        }
         return;
       }
 
@@ -233,10 +236,12 @@ export default function App() {
 
       const [feedErr, errors] = await to(api.feeds.list_errors());
       if (feedErr) {
-        showToast(
-          { title: t("fail_load"), description: errDescription(feedErr) },
-          { level: "fail" },
-        );
+        if (!quiet) {
+          showToast(
+            { title: t("fail_load"), description: errDescription(feedErr) },
+            { level: "fail" },
+          );
+        }
         return;
       }
       feedErrors.value = errors;
@@ -254,7 +259,7 @@ export default function App() {
   refreshStatsRef.current = refreshStats;
   useEffect(() => {
     const refreshIfVisible = () => {
-      if (document.visibilityState === "visible") refreshStatsRef.current();
+      if (document.visibilityState === "visible") refreshStatsRef.current(true);
     };
     const timer = window.setInterval(refreshIfVisible, STATS_POLL_INTERVAL);
     document.addEventListener("visibilitychange", refreshIfVisible);
