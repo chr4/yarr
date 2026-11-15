@@ -20,7 +20,7 @@ import DropdownFolder from "../components/DropdownFolder";
 import ArticleView from "../components/ArticleView";
 import type { FeedTreeNode, TreeFeedNode } from "../components/FeedTree";
 import { setupKeybindings, KeyActions } from "../key";
-import { SettingsModel, UI_SIZE_MIN, UI_SIZE_MAX } from "../models/settings";
+import { SettingsModel, validUISize } from "../models/settings";
 import type { Theme } from "../models/settings";
 import type { Feed, Folder, Item, FeedStat, ItemStatus, ItemListQuery } from "../api-types";
 
@@ -151,6 +151,18 @@ export default function App() {
     ),
   );
 
+  // the minimum widths grow with the interface size, the column headers would not fit otherwise
+  const scaledWidth = (w: number) => Math.round(w * settings.values.ui_size.value);
+
+  // also applied in the index template, to avoid a flash on load. logging in shows the app without
+  // reloading the page, which has the default size then
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--v-ui-scale",
+      String(settings.values.ui_size.value),
+    );
+  }, [settings.values.ui_size.value]);
+
   const setFeedListCollapsed = (collapsed: boolean) => {
     if (settings.values.feed_list_collapsed.value === collapsed) return;
     settings.update({ feed_list_collapsed: collapsed });
@@ -160,9 +172,8 @@ export default function App() {
     // dragging the feed list narrow enough collapses it, dragging it back out expands it
     setFeedListCollapsed(w < 100);
     if (settings.values.feed_list_collapsed.value) return;
-    settings.update({
-      feed_list_width: clampColumnWidth(w, MIN_FEED_LIST_WIDTH, itemListShownWidth.value),
-    });
+    const clamped = clampColumnWidth(w, scaledWidth(MIN_FEED_LIST_WIDTH), itemListShownWidth.value);
+    settings.update({ feed_list_width: clamped });
   };
 
   useEffect(() => {
@@ -178,7 +189,8 @@ export default function App() {
 
   const resizeItemList = (w: number) => {
     const feedListSpace = settings.values.feed_list_collapsed.value ? 0 : feedListShownWidth.value;
-    settings.update({ item_list_width: clampColumnWidth(w, MIN_ITEM_LIST_WIDTH, feedListSpace) });
+    const clamped = clampColumnWidth(w, scaledWidth(MIN_ITEM_LIST_WIDTH), feedListSpace);
+    settings.update({ item_list_width: clamped });
   };
 
   // Computed signals
@@ -788,13 +800,10 @@ export default function App() {
         <div className="feed-list-header px-2 py-1 d-flex justify-content-between gap-2">
           <DropdownApp
             settings={settings}
-            onUISizeChange={delta => {
-              const size = +(settings.values.ui_size.value + 0.1 * delta).toFixed(1);
-              settings.update({ ui_size: Math.min(Math.max(UI_SIZE_MIN, size), UI_SIZE_MAX) });
-              document.documentElement.style.setProperty(
-                "--v-ui-scale",
-                String(settings.values.ui_size.value),
-              );
+            onUISizeChange={size => {
+              settings.update({ ui_size: validUISize(size) });
+              resizeFeedList(settings.values.feed_list_width.value);
+              resizeItemList(settings.values.item_list_width.value);
             }}
             onShowShortcuts={() => (showModal.value = "shortcuts")}
             requiresAuth={window.app?.requiresAuth}

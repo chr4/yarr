@@ -3,10 +3,11 @@ import type { Lang } from "../i18n";
 import Dropdown from "./Dropdown";
 import Icon from "./Icon";
 import Tooltip from "./Tooltip";
-import { UI_SIZE_MIN, UI_SIZE_MAX } from "../models/settings";
 import type { AppSettings, Theme } from "../models/settings";
 
 const THEMES: Theme[] = ["light", "sepia", "night", "system"];
+
+const UI_SIZES = [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6];
 
 const LANGUAGES: { code: Lang; name: string }[] = [
   { code: "en", name: "English" },
@@ -24,7 +25,7 @@ interface DropdownAppProps {
   onShowShortcuts: () => void;
   requiresAuth: boolean;
   onLogout: () => void;
-  onUISizeChange: (delta: number) => void;
+  onUISizeChange: (size: number) => void;
 }
 
 export default function DropdownApp({
@@ -64,32 +65,22 @@ export default function DropdownApp({
       <div className="c-dropdown-header" role="heading" aria-level={2}>
         {t("ui_size")}
       </div>
-      <div className="row text-center m-0">
-        <button
-          type="button"
-          className="c-dropdown-item col-4 px-0"
-          style={{ fontSize: "0.8rem" }}
-          disabled={uiSize <= UI_SIZE_MIN}
-          onClick={e => {
-            e.stopPropagation();
-            onUISizeChange(-1);
-          }}>
-          A
-        </button>
-        <div className="col-4 d-flex align-items-center justify-content-center user-select-none">
-          {Math.round(uiSize * 100)}%
-        </div>
-        <button
-          type="button"
-          className="c-dropdown-item col-4 px-0"
-          style={{ fontSize: "1.2rem" }}
-          disabled={uiSize >= UI_SIZE_MAX}
-          onClick={e => {
-            e.stopPropagation();
-            onUISizeChange(1);
-          }}>
-          A
-        </button>
+      {/* a select rather than buttons: the menu grows and shrinks with the size, which moved
+          buttons clicked repeatedly away from the pointer, onto other entries */}
+      <div className="c-dropdown-item c-dropdown-select d-flex align-items-center gap-1">
+        <span className="flex-grow-1">{Math.round(uiSize * 100)}%</span>
+        <Icon className="flex-shrink-0" name="chevron-down" />
+        <select
+          aria-label={t("ui_size")}
+          value={String(uiSize)}
+          onClick={e => e.stopPropagation()}
+          onChange={e => onUISizeChange(Number((e.target as HTMLSelectElement).value))}>
+          {UI_SIZES.map(size => (
+            <option key={size} value={String(size)}>
+              {Math.round(size * 100)}%
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="c-dropdown-divider" />
