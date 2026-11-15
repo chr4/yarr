@@ -116,7 +116,8 @@ export default function Filters({
   const patternEmpty = useComputed(() => !form.value.pattern.trim());
 
   const runPreview = async () => {
-    if (!form.value.pattern.trim()) return;
+    // a preview scheduled before the view was closed
+    if (closed.current || !form.value.pattern.trim()) return;
     const seq = ++previewSeq.current;
     const [err, data] = await to(api.filters.preview({ ...form.value, enabled: true }));
     if (seq !== previewSeq.current) return; // the form changed in the meantime
@@ -126,15 +127,23 @@ export default function Filters({
     }
     preview.value = { loading: false, error: data.error || "", count: data.count, list: data.list };
   };
+  const closed = useRef(false);
+  useEffect(
+    () => () => {
+      closed.current = true;
+      previewSeq.current++;
+    },
+    [],
+  );
   const runPreviewRef = useRef(runPreview);
   runPreviewRef.current = runPreview;
   const schedulePreview = useMemo(() => debounce(() => runPreviewRef.current(), PREVIEW_DELAY), []);
 
-  // a changed form invalidates the save error and the preview
+  // a changed form invalidates the save error and the preview, also one being asked for
   useEffect(() => {
     saveError.value = "";
+    previewSeq.current++;
     if (!form.value.pattern.trim()) {
-      previewSeq.current++;
       preview.value = EMPTY_PREVIEW;
       return;
     }

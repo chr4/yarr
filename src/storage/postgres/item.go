@@ -165,7 +165,7 @@ var visiblePredicate = fmt.Sprintf("(i.filter_id is null or i.status = %d)", mod
 
 func (s *PostgresStorage) CountItems() int {
 	var count int
-	err := s.db.QueryRow(`select count(*) from items`).Scan(&count)
+	err := s.db.QueryRow(`select count(*) from items i where ` + visiblePredicate).Scan(&count)
 	if err != nil {
 		log.Print(err)
 		return 0
@@ -265,8 +265,8 @@ func (s *PostgresStorage) MarkItemsRead(filter model.MarkFilter) bool {
 	}, false)
 	query := fmt.Sprintf(`
 		update items as i set status = %d
-		where %s and i.status != %d
-		`, model.READ, predicate, model.STARRED)
+		where %s and i.status != %d and %s
+		`, model.READ, predicate, model.STARRED, visiblePredicate)
 	_, err := s.db.Exec(query, args...)
 	if err != nil {
 		log.Print(err)

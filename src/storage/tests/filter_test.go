@@ -104,6 +104,16 @@ func TestFilteredItems(t *testing.T) {
 			t.Fatalf("expected new1 to be hidden, got %v", have)
 		}
 
+		// only what can be listed counts, e.g. for the fever api
+		if have, want := db.CountItems(), len(listedGUIDs(db, model.ItemFilter{})); have != want {
+			t.Fatalf("expected %d items to be counted, got %d", want, have)
+		}
+
+		// marking all read leaves the hidden items as they are, item111 stays unread
+		if !db.MarkItemsRead(model.MarkFilter{FeedID: &scope.feed11.Id}) {
+			t.Fatal("failed to mark the items read")
+		}
+
 		// disabling the filter brings the items back as they were
 		db.UpdateFilter(f.Id, model.FilterParams{Pattern: "TITLE11", Enabled: false})
 		if err := filter.Refilter(db); err != nil {
