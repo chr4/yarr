@@ -137,15 +137,15 @@ export default function App() {
   const feedListShownWidth = useComputed(() =>
     clampColumnWidth(
       settings.values.feed_list_width.value,
-      MIN_FEED_LIST_WIDTH,
-      MIN_ITEM_LIST_WIDTH,
+      Math.round(MIN_FEED_LIST_WIDTH * settings.values.ui_size.value),
+      Math.round(MIN_ITEM_LIST_WIDTH * settings.values.ui_size.value),
       windowWidth.value,
     ),
   );
   const itemListShownWidth = useComputed(() =>
     clampColumnWidth(
       settings.values.item_list_width.value,
-      MIN_ITEM_LIST_WIDTH,
+      Math.round(MIN_ITEM_LIST_WIDTH * settings.values.ui_size.value),
       settings.values.feed_list_collapsed.value ? 0 : feedListShownWidth.value,
       windowWidth.value,
     ),
@@ -801,9 +801,8 @@ export default function App() {
           <DropdownApp
             settings={settings}
             onUISizeChange={size => {
+              // the shown column widths follow, with their minimums growing with the size
               settings.update({ ui_size: validUISize(size) });
-              resizeFeedList(settings.values.feed_list_width.value);
-              resizeItemList(settings.values.item_list_width.value);
             }}
             onShowShortcuts={() => (showModal.value = "shortcuts")}
             requiresAuth={window.app?.requiresAuth}
