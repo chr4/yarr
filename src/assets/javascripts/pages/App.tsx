@@ -296,7 +296,9 @@ export default function App() {
     return last.getBoundingClientRect().bottom <= el.getBoundingClientRect().top + el.clientTop;
   };
 
-  const revealNewItems = async () => {
+  // show the first of the items just added (the next page, a new list) that is left to read,
+  // rather than the first unread one in the list, which may be one scrolled over further up
+  const revealNewItems = async (added: Item[]) => {
     // read articles are kept in the unread view until the list is reloaded.
     // drop them now, so that only what is left to read is shown
     if (settings.values.filter.value === "unread") {
@@ -306,12 +308,13 @@ export default function App() {
         await new Promise(resolve => setTimeout(resolve, 0));
       }
     }
-    scrollToFirstUnread();
+    const ids = new Set(added.map(i => i.id));
+    const shown = items.value.filter(i => ids.has(i.id));
+    scrollToItem(shown.find(i => i.status === "unread") ?? shown[0]);
   };
 
-  const scrollToFirstUnread = () => {
+  const scrollToItem = (item?: Item) => {
     const el = itemListRef.current;
-    const item = items.value.find(i => i.status === "unread");
     const target = item && el?.querySelector(`[data-id="${item.id}"]`);
     if (!el || !target) return;
     const offset = target.getBoundingClientRect().top - el.getBoundingClientRect().top;
@@ -355,7 +358,7 @@ export default function App() {
       // new items would end up out of sight above the viewport
       const scrolledPast = settings.values.mark_read_on_scroll.value && itemListScrolledPast();
       items.value = loadMore ? items.value.concat(data.list) : data.list;
-      if (scrolledPast) setTimeout(revealNewItems, 0);
+      if (scrolledPast) setTimeout(() => revealNewItems(data.list), 0);
       itemsHasMore.value = data.has_more;
 
       if (data.has_more && !loadMore) {
@@ -524,7 +527,8 @@ export default function App() {
       seen.delete(entry.target);
       const id = Number((entry.target as HTMLElement).dataset.id);
       const item = items.value.find(i => i.id === id);
-      if (item?.status === "unread") scrolledOut.push(item);
+      // the selected item is marked read as it is opened, counting it here too would count it twice
+      if (item?.status === "unread" && item.id !== itemSelected.value) scrolledOut.push(item);
     }
     if (settings.values.mark_read_on_scroll.value && scrolledOut.length)
       markScrolledItemsRead(scrolledOut);
