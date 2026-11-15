@@ -72,11 +72,6 @@ func (w *Worker) fetchPage(url string, internal func(url string) bool) (string, 
 	}
 	defer res.Body.Close()
 
-	// e.g. a link to a PDF, which would only be binary noise to match against
-	if ct := res.Header.Get("Content-Type"); ct != "" && !strings.Contains(strings.ToLower(ct), "html") {
-		return "", fmt.Errorf("not a web page: %s", ct)
-	}
-
 	r, err := charset.NewReader(io.LimitReader(res.Body, pageMaxSize), res.Header.Get("Content-Type"))
 	if err != nil {
 		return "", err
@@ -91,6 +86,11 @@ func (w *Worker) fetchPage(url string, internal func(url string) bool) (string, 
 	}
 	if res.StatusCode >= 500 {
 		return "", fmt.Errorf("server error: %s", res.Status)
+	}
+	// e.g. a link to a PDF, which would only be binary noise to match against. told after
+	// a challenge, which might come as anything
+	if ct := res.Header.Get("Content-Type"); ct != "" && !strings.Contains(strings.ToLower(ct), "html") {
+		return "", fmt.Errorf("not a web page: %s", ct)
 	}
 	// error pages are kept as well: a paywall may well answer with 402 or 403
 	return ReducePage(strings.NewReader(string(body))), nil

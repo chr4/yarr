@@ -128,6 +128,22 @@ func TestFilteredItems(t *testing.T) {
 	})
 }
 
+func TestForEachItemOfFeed(t *testing.T) {
+	dbtest(t, func(t *testing.T, db storage.Storage) {
+		scope := testItemsSetup(db)
+		count := func(feedId *int64) int {
+			n := 0
+			if err := db.ForEachItem(feedId, true, true, func(model.Item) { n++ }); err != nil {
+				t.Fatal(err)
+			}
+			return n
+		}
+		if all, feed11 := count(nil), count(&scope.feed11.Id); feed11 != 3 || all <= feed11 {
+			t.Fatalf("expected the 3 items of feed11 out of all %d, got %d", all, feed11)
+		}
+	})
+}
+
 func TestItemPages(t *testing.T) {
 	dbtest(t, func(t *testing.T, db storage.Storage) {
 		feed := db.CreateFeed(model.CreateFeedParams{Title: "feed", FeedLink: "http://example.com/feed.xml"})
