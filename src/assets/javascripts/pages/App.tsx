@@ -928,13 +928,18 @@ export default function App() {
                   <RelativeTime val={item.date} locale={settings.values.language.value} />
                 </small>
               </div>
-              <div className="text-break line-clamp-3">
+              <div className="c-listitem-title text-break line-clamp-3">
                 {feedsById.value[item.feed_id]?.icon ? (
-                  <span className="c-icon me-1">
-                    <img src={feedsById.value[item.feed_id].icon!} alt="" loading="lazy" />
+                  <span className="c-icon">
+                    <img
+                      src={feedsById.value[item.feed_id].icon!}
+                      alt=""
+                      loading="lazy"
+                      draggable={false}
+                    />
                   </span>
                 ) : (
-                  <Icon className="me-1" name="rss" />
+                  <Icon name="rss" />
                 )}
                 {item.title || t("untitled")}
               </div>

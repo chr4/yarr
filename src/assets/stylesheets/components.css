@@ -193,6 +193,19 @@
   border-bottom: 1px solid var(--v-border-color);
 }
 
+/* the feed icon sits in the indent of the title's first line, centered on it, so that the title
+   starts next to it even when its first word is too long for the line */
+.c-listitem-title {
+  position: relative;
+  text-indent: 1.25rem;
+
+  & > .c-icon {
+    position: absolute;
+    top: 0.25rem;
+    left: 0;
+  }
+}
+
 .c-listitem {
   padding: 0.375rem 0.5rem;
   width: 100%;
