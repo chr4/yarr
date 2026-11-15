@@ -407,6 +407,9 @@ export default function App() {
     if (item.link && (e.ctrlKey || e.metaKey || e.shiftKey)) return;
     e.preventDefault();
     itemSelected.value = item.id;
+    // a click focuses the entry, which kept a focus ring on it (and Enter acting on it) after moving
+    // on with the keyboard. entries chosen with the keyboard (detail 0) keep the focus
+    if (e.detail > 0) (e.currentTarget as HTMLElement).blur();
   };
 
   // Status toggle
@@ -918,9 +921,6 @@ export default function App() {
               draggable={false}
               role="radio"
               aria-checked={itemSelected.value === item.id}
-              // keep mouse clicks from focusing the entry, which would keep a focus ring on it
-              // (and Enter acting on it) after moving on with the keyboard
-              onMouseDown={e => e.button === 0 && e.preventDefault()}
               onClick={e => selectItem(e, item)}>
               <div
                 style={{ lineHeight: "100%", opacity: 0.7, marginBottom: "0.1rem" }}
