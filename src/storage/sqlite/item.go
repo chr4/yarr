@@ -51,12 +51,14 @@ func (s *SQLiteStorage) CreateItems(items []model.Item) bool {
 			insert into items (
 				guid, feed_id, title, link, date,
 				content, media_links,
-				date_arrived, last_arrived, status
+				date_arrived, last_arrived, status,
+				filter_id
 			)
 			values (
 				:guid, :feed_id, :title, :link, strftime('%Y-%m-%d %H:%M:%f', :date),
 				:content, :media_links,
-				:date_arrived, :last_arrived, :status
+				:date_arrived, :last_arrived, :status,
+				:filter_id
 			)
 			on conflict (feed_id, guid) do update set
 				last_arrived = :last_arrived`,
@@ -70,6 +72,7 @@ func (s *SQLiteStorage) CreateItems(items []model.Item) bool {
 			sql.Named("date_arrived", now),
 			sql.Named("last_arrived", now),
 			sql.Named("status", item.Status),
+			sql.Named("filter_id", item.FilterId),
 		)
 		if err != nil {
 			log.Print(err)
@@ -160,9 +163,12 @@ func listQueryPredicate(filter model.ItemFilter, newestFirst bool) (string, []an
 	return predicate, args
 }
 
+// items hidden by a filter are left out, unless they were starred
+var visiblePredicate = fmt.Sprintf("(i.filter_id is null or i.status = %d)", model.STARRED)
+
 func (s *SQLiteStorage) CountItems() int {
 	var count int
-	err := s.db.QueryRow(`select count(*) from items`).Scan(&count)
+	err := s.db.QueryRow(`select count(*) from items i where ` + visiblePredicate).Scan(&count)
 	if err != nil {
 		log.Print(err)
 		return 0
@@ -177,6 +183,7 @@ func (s *SQLiteStorage) ListItems(
 	withContent bool,
 ) []model.Item {
 	predicate, args := listQueryPredicate(filter, newestFirst)
+	predicate += " and " + visiblePredicate
 	result := make([]model.Item, 0)
 
 	order := "date desc, id desc"
@@ -265,8 +272,8 @@ func (s *SQLiteStorage) MarkItemsRead(filter model.MarkFilter) bool {
 	}, false)
 	query := fmt.Sprintf(`
 		update items as i set status = %d
-		where %s and i.status != %d
-		`, model.READ, predicate, model.STARRED)
+		where %s and i.status != %d and %s
+		`, model.READ, predicate, model.STARRED, visiblePredicate)
 	_, err := s.db.Exec(query, args...)
 	if err != nil {
 		log.Print(err)
@@ -279,7 +286,7 @@ func (s *SQLiteStorage) FeedStats() []model.FeedStat {
 	rows, err := s.db.Query(fmt.Sprintf(`
 		select
 			feed_id,
-			sum(case status when %d then 1 else 0 end),
+			sum(case when status = %d and filter_id is null then 1 else 0 end),
 			sum(case status when %d then 1 else 0 end)
 		from items
 		group by feed_id
