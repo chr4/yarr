@@ -166,6 +166,7 @@ type Settings struct {
 	FeedListCollapsed bool    `json:"feed_list_collapsed"`
 	ItemListWidth     int     `json:"item_list_width"`
 	SortNewestFirst   bool    `json:"sort_newest_first"`
+	MarkReadOnScroll  bool    `json:"mark_read_on_scroll"`
 	ThemeName         string  `json:"theme_name"`
 	ThemeFont         string  `json:"theme_font"`
 	ThemeSize         float64 `json:"theme_size"`
@@ -193,6 +194,7 @@ type UpdateSettingsParams struct {
 	FeedListCollapsed *bool    `json:"feed_list_collapsed"`
 	ItemListWidth     *int     `json:"item_list_width"`
 	SortNewestFirst   *bool    `json:"sort_newest_first"`
+	MarkReadOnScroll  *bool    `json:"mark_read_on_scroll"`
 	ThemeName         *string  `json:"theme_name"`
 	ThemeFont         *string  `json:"theme_font"`
 	ThemeSize         *float64 `json:"theme_size"`
@@ -209,6 +211,7 @@ func (s Settings) Map() map[string]any {
 		"feed_list_collapsed": s.FeedListCollapsed,
 		"item_list_width":     s.ItemListWidth,
 		"sort_newest_first":   s.SortNewestFirst,
+		"mark_read_on_scroll": s.MarkReadOnScroll,
 		"theme_name":          s.ThemeName,
 		"theme_font":          s.ThemeFont,
 		"theme_size":          s.ThemeSize,
@@ -226,6 +229,7 @@ func SettingsDefault() Settings {
 		FeedListCollapsed: false,
 		ItemListWidth:     300,
 		SortNewestFirst:   true,
+		MarkReadOnScroll:  false,
 		ThemeName:         "light",
 		ThemeFont:         "",
 		ThemeSize:         1,
