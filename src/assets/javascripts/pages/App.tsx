@@ -20,7 +20,7 @@ import DropdownFolder from "../components/DropdownFolder";
 import ArticleView from "../components/ArticleView";
 import type { FeedTreeNode, TreeFeedNode } from "../components/FeedTree";
 import { setupKeybindings, KeyActions } from "../key";
-import { SettingsModel } from "../models/settings";
+import { SettingsModel, validUISize } from "../models/settings";
 import type { Theme } from "../models/settings";
 import type { Feed, Folder, Item, FeedStat, ItemStatus, ItemListQuery } from "../api-types";
 
@@ -33,6 +33,22 @@ const THEME_COLORS: Record<string, string> = {
 };
 
 const TITLE = document.title;
+
+// room kept for the article view when resizing the feed and item lists
+const MIN_ARTICLE_WIDTH = 300;
+// the feed list header (menus and filters) needs this much
+const MIN_FEED_LIST_WIDTH = 200;
+const MIN_ITEM_LIST_WIDTH = 200;
+
+function clampColumnWidth(
+  width: number,
+  min: number,
+  otherColumnWidth: number,
+  windowWidth = window.innerWidth,
+): number {
+  const max = Math.max(min, windowWidth - otherColumnWidth - MIN_ARTICLE_WIDTH);
+  return Math.min(Math.max(min, width), max);
+}
 
 export default function App() {
   const { t, setLang } = useI18n();
@@ -88,6 +104,10 @@ export default function App() {
       ),
   );
 
+  // the feed list is collapsed only in the desktop layout
+  const feedListShownCollapsed = () =>
+    settings.values.feed_list_collapsed.value && window.matchMedia("(min-width: 992px)").matches;
+
   // Theme meta tag
   const updateMetaTheme = useCallback((themeName: Theme) => {
     let active = themeName;
@@ -112,12 +132,65 @@ export default function App() {
     setLang(settings.values.language.value);
   }, [settings.values.language.value, setLang]);
 
+  // the widths as shown: in a smaller window than they were set in, they leave room for the article
+  const windowWidth = useSignal(window.innerWidth);
+  const feedListShownWidth = useComputed(() =>
+    clampColumnWidth(
+      settings.values.feed_list_width.value,
+      Math.round(MIN_FEED_LIST_WIDTH * settings.values.ui_size.value),
+      Math.round(MIN_ITEM_LIST_WIDTH * settings.values.ui_size.value),
+      windowWidth.value,
+    ),
+  );
+  const itemListShownWidth = useComputed(() =>
+    clampColumnWidth(
+      settings.values.item_list_width.value,
+      Math.round(MIN_ITEM_LIST_WIDTH * settings.values.ui_size.value),
+      settings.values.feed_list_collapsed.value ? 0 : feedListShownWidth.value,
+      windowWidth.value,
+    ),
+  );
+
+  // the minimum widths grow with the interface size, the column headers would not fit otherwise
+  const scaledWidth = (w: number) => Math.round(w * settings.values.ui_size.value);
+
+  // also applied in the index template, to avoid a flash on load. logging in shows the app without
+  // reloading the page, which has the default size then
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--v-ui-scale",
+      String(settings.values.ui_size.value),
+    );
+  }, [settings.values.ui_size.value]);
+
+  const setFeedListCollapsed = (collapsed: boolean) => {
+    if (settings.values.feed_list_collapsed.value === collapsed) return;
+    settings.update({ feed_list_collapsed: collapsed });
+  };
+
   const resizeFeedList = (w: number) => {
-    settings.update({ feed_list_width: Math.min(Math.max(200, w), 700) });
+    // dragging the feed list narrow enough collapses it, dragging it back out expands it
+    setFeedListCollapsed(w < 100);
+    if (settings.values.feed_list_collapsed.value) return;
+    const clamped = clampColumnWidth(w, scaledWidth(MIN_FEED_LIST_WIDTH), itemListShownWidth.value);
+    settings.update({ feed_list_width: clamped });
+  };
+
+  useEffect(() => {
+    const onResize = () => (windowWidth.value = window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const resetFeedList = () => {
+    setFeedListCollapsed(false);
+    resizeFeedList(300);
   };
 
   const resizeItemList = (w: number) => {
-    settings.update({ item_list_width: Math.min(Math.max(200, w), 700) });
+    const feedListSpace = settings.values.feed_list_collapsed.value ? 0 : feedListShownWidth.value;
+    const clamped = clampColumnWidth(w, scaledWidth(MIN_ITEM_LIST_WIDTH), feedListSpace);
+    settings.update({ item_list_width: clamped });
   };
 
   // Computed signals
@@ -532,7 +605,8 @@ export default function App() {
         { level: "fail" },
       );
     else {
-      settings.values.feed.value = null;
+      // the collapsed feed list has no way to pick another feed, show all of them instead
+      settings.values.feed.value = feedListShownCollapsed() ? "" : null;
       refreshStats();
       refreshFeeds();
     }
@@ -563,7 +637,8 @@ export default function App() {
         { level: "fail" },
       );
     else {
-      settings.values.feed.value = null;
+      // the collapsed feed list has no way to pick another feed, show all of them instead
+      settings.values.feed.value = feedListShownCollapsed() ? "" : null;
       refreshStats();
       refreshFeeds();
     }
@@ -717,12 +792,18 @@ export default function App() {
       {/* Feed list column */}
       <div
         id="col-feed-list"
-        className="vh-100 position-relative d-flex flex-column border-end flex-shrink-0"
-        style={{ width: `${settings.values.feed_list_width.value}px` }}>
-        <Drag width={settings.values.feed_list_width.value} onResize={resizeFeedList} />
-        <div className="px-2 py-1 d-flex justify-content-between gap-2">
+        className={`vh-100 position-relative d-flex flex-column border-end flex-shrink-0 ${
+          settings.values.feed_list_collapsed.value ? "is-collapsed" : ""
+        }`}
+        style={{ width: `${feedListShownWidth.value}px` }}>
+        <Drag onResize={resizeFeedList} onReset={resetFeedList} />
+        <div className="feed-list-header px-2 py-1 d-flex justify-content-between gap-2">
           <DropdownApp
             settings={settings}
+            onUISizeChange={size => {
+              // the shown column widths follow, with their minimums growing with the size
+              settings.update({ ui_size: validUISize(size) });
+            }}
             onShowShortcuts={() => (showModal.value = "shortcuts")}
             requiresAuth={window.app?.requiresAuth}
             onLogout={async () => {
@@ -735,7 +816,7 @@ export default function App() {
               else document.location.reload();
             }}
           />
-          <div class="d-flex flex-row gap-1">
+          <div class="feed-list-filters d-flex flex-row gap-1">
             <Tooltip label={t("unread")}>
               <button
                 type="button"
@@ -773,12 +854,17 @@ export default function App() {
             refreshAvailable={refreshAvailable.value}
             onFetchAllFeeds={fetchAllFeeds}
             onImportOPML={importOPML}
-            onShowNewFeed={() => (showNewFeed.value = true)}
+            onShowNewFeed={() => {
+              if (feedListShownCollapsed()) {
+                settings.update({ feed_list_collapsed: false });
+              }
+              showNewFeed.value = true;
+            }}
           />
         </div>
         <div class="d-flex flex-column overflow-auto border-top flex-grow-1">
           {showNewFeed.value && (
-            <div className="px-2 py-3 overflow-auto flex-shrink-0 border-bottom">
+            <div className="feed-list-new-feed px-2 py-3 overflow-auto flex-shrink-0 border-bottom">
               <NewFeed
                 folderId={currentFeed.value?.folder_id ?? currentFolder.value?.id ?? null}
                 onCancel={() => (showNewFeed.value = false)}
@@ -806,7 +892,7 @@ export default function App() {
         </div>
 
         {loadingFeeds.value > 0 && (
-          <div className="px-2 py-1 d-flex align-items-center border-top flex-shrink-0">
+          <div className="feed-list-loading px-2 py-1 d-flex align-items-center border-top flex-shrink-0">
             <span className="c-spinner mx-2" />
             <span className="text-truncate cursor-default user-select-none">
               {t("refreshing_progress", { count: loadingFeeds.value })}
@@ -819,8 +905,8 @@ export default function App() {
       <div
         id="col-item-list"
         className="vh-100 position-relative d-flex flex-column border-end flex-shrink-0"
-        style={{ width: `${settings.values.item_list_width.value}px` }}>
-        <Drag width={settings.values.item_list_width.value} onResize={resizeItemList} />
+        style={{ width: `${itemListShownWidth.value}px` }}>
+        <Drag onResize={resizeItemList} onReset={() => resizeItemList(300)} />
         <div className="px-2 py-1 d-flex gap-1 align-items-center">
           <Tooltip label={t("show_feeds")}>
             <button

@@ -7,6 +7,8 @@ import type { AppSettings, Theme } from "../models/settings";
 
 const THEMES: Theme[] = ["light", "sepia", "night", "system"];
 
+const UI_SIZES = [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6];
+
 const LANGUAGES: { code: Lang; name: string }[] = [
   { code: "en", name: "English" },
   { code: "de", name: "Deutsch" },
@@ -23,6 +25,7 @@ interface DropdownAppProps {
   onShowShortcuts: () => void;
   requiresAuth: boolean;
   onLogout: () => void;
+  onUISizeChange: (size: number) => void;
 }
 
 export default function DropdownApp({
@@ -30,8 +33,11 @@ export default function DropdownApp({
   onShowShortcuts,
   requiresAuth,
   onLogout,
+  onUISizeChange,
 }: DropdownAppProps) {
   const { t } = useI18n();
+  const sidebarCollapsed = settings.values.feed_list_collapsed.value;
+  const uiSize = settings.values.ui_size.value;
 
   return (
     <Dropdown toggleClass="" drop="start" title={t("settings_main")} button={<Icon name="anchor" />}>
@@ -56,12 +62,41 @@ export default function DropdownApp({
       </div>
 
       <div className="c-dropdown-divider" />
+      <div className="c-dropdown-header" role="heading" aria-level={2}>
+        {t("ui_size")}
+      </div>
+      {/* a select rather than buttons: the menu grows and shrinks with the size, which moved
+          buttons clicked repeatedly away from the pointer, onto other entries */}
+      <div className="c-dropdown-item c-dropdown-select d-flex align-items-center gap-1">
+        <span className="flex-grow-1">{Math.round(uiSize * 100)}%</span>
+        <Icon className="flex-shrink-0" name="chevron-down" />
+        <select
+          aria-label={t("ui_size")}
+          value={String(uiSize)}
+          onClick={e => e.stopPropagation()}
+          onChange={e => onUISizeChange(Number((e.target as HTMLSelectElement).value))}>
+          {UI_SIZES.map(size => (
+            <option key={size} value={String(size)}>
+              {Math.round(size * 100)}%
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="c-dropdown-divider" />
       <button
         type="button"
         className="c-dropdown-item w-100 text-start d-flex gap-1"
         onClick={onShowShortcuts}>
         <Icon className="me-1" name="help-circle" />
         {t("shortcuts")}
+      </button>
+      <button
+        type="button"
+        className="c-dropdown-item w-100 text-start d-none d-lg-flex gap-1"
+        onClick={() => settings.update({ feed_list_collapsed: !sidebarCollapsed })}>
+        <Icon className="me-1" name={sidebarCollapsed ? "sidebar-open" : "sidebar-close"} />
+        {sidebarCollapsed ? t("expand_sidebar") : t("collapse_sidebar")}
       </button>
 
       <div className="c-dropdown-divider" />

@@ -28,6 +28,8 @@ func (s *PostgresStorage) GetSettings() model.Settings {
 			json.Unmarshal(val, &result.Feed)
 		case "feed_list_width":
 			json.Unmarshal(val, &result.FeedListWidth)
+		case "feed_list_collapsed":
+			json.Unmarshal(val, &result.FeedListCollapsed)
 		case "item_list_width":
 			json.Unmarshal(val, &result.ItemListWidth)
 		case "sort_newest_first":
@@ -38,6 +40,8 @@ func (s *PostgresStorage) GetSettings() model.Settings {
 			json.Unmarshal(val, &result.ThemeFont)
 		case "theme_size":
 			json.Unmarshal(val, &result.ThemeSize)
+		case "ui_size":
+			json.Unmarshal(val, &result.UISize)
 		case "refresh_rate":
 			json.Unmarshal(val, &result.RefreshRate)
 		case "language":
@@ -79,6 +83,9 @@ func (s *PostgresStorage) UpdateSettings(params model.UpdateSettingsParams) bool
 	if params.FeedListWidth != nil {
 		errs = append(errs, update("feed_list_width", *params.FeedListWidth))
 	}
+	if params.FeedListCollapsed != nil {
+		errs = append(errs, update("feed_list_collapsed", *params.FeedListCollapsed))
+	}
 	if params.ItemListWidth != nil {
 		errs = append(errs, update("item_list_width", *params.ItemListWidth))
 	}
@@ -93,6 +100,9 @@ func (s *PostgresStorage) UpdateSettings(params model.UpdateSettingsParams) bool
 	}
 	if params.ThemeSize != nil {
 		errs = append(errs, update("theme_size", *params.ThemeSize))
+	}
+	if params.UISize != nil {
+		errs = append(errs, update("ui_size", *params.UISize))
 	}
 	if params.RefreshRate != nil {
 		errs = append(errs, update("refresh_rate", *params.RefreshRate))

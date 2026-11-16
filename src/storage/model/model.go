@@ -160,58 +160,78 @@ type FeedStat struct {
 }
 
 type Settings struct {
-	Filter          string  `json:"filter"`
-	Feed            string  `json:"feed"`
-	FeedListWidth   int     `json:"feed_list_width"`
-	ItemListWidth   int     `json:"item_list_width"`
-	SortNewestFirst bool    `json:"sort_newest_first"`
-	ThemeName       string  `json:"theme_name"`
-	ThemeFont       string  `json:"theme_font"`
-	ThemeSize       float64 `json:"theme_size"`
-	RefreshRate     int64   `json:"refresh_rate"`
-	Language        string  `json:"language"`
+	Filter            string  `json:"filter"`
+	Feed              string  `json:"feed"`
+	FeedListWidth     int     `json:"feed_list_width"`
+	FeedListCollapsed bool    `json:"feed_list_collapsed"`
+	ItemListWidth     int     `json:"item_list_width"`
+	SortNewestFirst   bool    `json:"sort_newest_first"`
+	ThemeName         string  `json:"theme_name"`
+	ThemeFont         string  `json:"theme_font"`
+	ThemeSize         float64 `json:"theme_size"`
+	UISize            float64 `json:"ui_size"`
+	RefreshRate       int64   `json:"refresh_rate"`
+	Language          string  `json:"language"`
+}
+
+// interface sizes offered, as a factor of the default size
+const (
+	UISizeMin = 0.8
+	UISizeMax = 1.6
+)
+
+// ValidUISize reports whether the interface size is one offered, which also
+// rules out NaN.
+func ValidUISize(size float64) bool {
+	return size >= UISizeMin && size <= UISizeMax
 }
 
 type UpdateSettingsParams struct {
-	Filter          *string  `json:"filter"`
-	Feed            *string  `json:"feed"`
-	FeedListWidth   *int     `json:"feed_list_width"`
-	ItemListWidth   *int     `json:"item_list_width"`
-	SortNewestFirst *bool    `json:"sort_newest_first"`
-	ThemeName       *string  `json:"theme_name"`
-	ThemeFont       *string  `json:"theme_font"`
-	ThemeSize       *float64 `json:"theme_size"`
-	RefreshRate     *int64   `json:"refresh_rate"`
-	Language        *string  `json:"language"`
+	Filter            *string  `json:"filter"`
+	Feed              *string  `json:"feed"`
+	FeedListWidth     *int     `json:"feed_list_width"`
+	FeedListCollapsed *bool    `json:"feed_list_collapsed"`
+	ItemListWidth     *int     `json:"item_list_width"`
+	SortNewestFirst   *bool    `json:"sort_newest_first"`
+	ThemeName         *string  `json:"theme_name"`
+	ThemeFont         *string  `json:"theme_font"`
+	ThemeSize         *float64 `json:"theme_size"`
+	UISize            *float64 `json:"ui_size"`
+	RefreshRate       *int64   `json:"refresh_rate"`
+	Language          *string  `json:"language"`
 }
 
 func (s Settings) Map() map[string]any {
 	return map[string]any{
-		"filter":            s.Filter,
-		"feed":              s.Feed,
-		"feed_list_width":   s.FeedListWidth,
-		"item_list_width":   s.ItemListWidth,
-		"sort_newest_first": s.SortNewestFirst,
-		"theme_name":        s.ThemeName,
-		"theme_font":        s.ThemeFont,
-		"theme_size":        s.ThemeSize,
-		"refresh_rate":      s.RefreshRate,
-		"language":          s.Language,
+		"filter":              s.Filter,
+		"feed":                s.Feed,
+		"feed_list_width":     s.FeedListWidth,
+		"feed_list_collapsed": s.FeedListCollapsed,
+		"item_list_width":     s.ItemListWidth,
+		"sort_newest_first":   s.SortNewestFirst,
+		"theme_name":          s.ThemeName,
+		"theme_font":          s.ThemeFont,
+		"theme_size":          s.ThemeSize,
+		"ui_size":             s.UISize,
+		"refresh_rate":        s.RefreshRate,
+		"language":            s.Language,
 	}
 }
 
 func SettingsDefault() Settings {
 	return Settings{
-		Filter:          "",
-		Feed:            "",
-		FeedListWidth:   300,
-		ItemListWidth:   300,
-		SortNewestFirst: true,
-		ThemeName:       "light",
-		ThemeFont:       "",
-		ThemeSize:       1,
-		RefreshRate:     0,
-		Language:        "en",
+		Filter:            "",
+		Feed:              "",
+		FeedListWidth:     300,
+		FeedListCollapsed: false,
+		ItemListWidth:     300,
+		SortNewestFirst:   true,
+		ThemeName:         "light",
+		ThemeFont:         "",
+		ThemeSize:         1,
+		UISize:            1,
+		RefreshRate:       0,
+		Language:          "en",
 	}
 }
 

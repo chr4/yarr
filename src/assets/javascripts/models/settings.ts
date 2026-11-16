@@ -9,17 +9,27 @@ export type Filter = "" | "starred" | "unread";
 export type Theme = "system" | "light" | "sepia" | "night";
 export type ThemeFont = "" | "serif" | "monospace";
 
+export const UI_SIZE_MIN = 0.8;
+export const UI_SIZE_MAX = 1.6;
+
+// the stored interface size, or the default for anything out of range
+export function validUISize(size: unknown): number {
+  return typeof size === "number" && size >= UI_SIZE_MIN && size <= UI_SIZE_MAX ? size : 1;
+}
+
 export const SettingsModel = createModel(
   (initial: Partial<Settings> = {}, onSaveError?: (err: unknown) => void) => {
     const values = {
       filter: signal<Filter>((initial.filter as Filter) || ""),
       feed: signal<string | null>(initial.feed ?? null),
       feed_list_width: signal<number>(initial.feed_list_width || 300),
+      feed_list_collapsed: signal<boolean>(!!initial.feed_list_collapsed),
       item_list_width: signal<number>(initial.item_list_width || 300),
       sort_newest_first: signal<boolean>(initial.sort_newest_first ?? true),
       theme_name: signal<Theme>((initial.theme_name as Theme) || "system"),
       theme_font: signal<ThemeFont>((initial.theme_font as ThemeFont) || ""),
       theme_size: signal<number>(initial.theme_size || 1),
+      ui_size: signal<number>(validUISize(initial.ui_size)),
       refresh_rate: signal<number>(initial.refresh_rate || 0),
       language: signal<Lang>((initial.language as Lang) || "en"),
     } satisfies Record<keyof SettingsUpdateData, Signal<unknown>>;
@@ -30,7 +40,9 @@ export const SettingsModel = createModel(
       });
     };
 
-    const saveDebounced = debounce((data: SettingsUpdateData) => save(data), 1000);
+    // one for each width: saving the other one must not cancel a pending save
+    const saveFeedListWidth = debounce((w: number) => save({ feed_list_width: w }), 1000);
+    const saveItemListWidth = debounce((w: number) => save({ item_list_width: w }), 1000);
 
     const assign = (patch: SettingsUpdateData) => {
       for (const key of Object.keys(patch) as (keyof SettingsUpdateData)[]) {
@@ -47,8 +59,8 @@ export const SettingsModel = createModel(
         assign(partial);
 
         const { feed_list_width, item_list_width, ...rest } = partial;
-        if (feed_list_width !== undefined) saveDebounced({ feed_list_width });
-        if (item_list_width !== undefined) saveDebounced({ item_list_width });
+        if (feed_list_width !== undefined) saveFeedListWidth(feed_list_width);
+        if (item_list_width !== undefined) saveItemListWidth(item_list_width);
 
         if (Object.keys(rest).length > 0) save(rest);
       },
