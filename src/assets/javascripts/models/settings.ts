@@ -39,7 +39,9 @@ export const SettingsModel = createModel(
       });
     };
 
-    const saveDebounced = debounce((data: SettingsUpdateData) => save(data), 1000);
+    // one for each width: saving the other one must not cancel a pending save
+    const saveFeedListWidth = debounce((w: number) => save({ feed_list_width: w }), 1000);
+    const saveItemListWidth = debounce((w: number) => save({ item_list_width: w }), 1000);
 
     const assign = (patch: SettingsUpdateData) => {
       for (const key of Object.keys(patch) as (keyof SettingsUpdateData)[]) {
@@ -56,8 +58,8 @@ export const SettingsModel = createModel(
         assign(partial);
 
         const { feed_list_width, item_list_width, ...rest } = partial;
-        if (feed_list_width !== undefined) saveDebounced({ feed_list_width });
-        if (item_list_width !== undefined) saveDebounced({ item_list_width });
+        if (feed_list_width !== undefined) saveFeedListWidth(feed_list_width);
+        if (item_list_width !== undefined) saveItemListWidth(item_list_width);
 
         if (Object.keys(rest).length > 0) save(rest);
       },
