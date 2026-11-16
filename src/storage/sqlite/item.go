@@ -47,7 +47,8 @@ func (s *SQLiteStorage) CreateItems(items []model.Item) bool {
 	})
 
 	for _, item := range items {
-		_, err = tx.Exec(`
+		var id int64
+		err = tx.QueryRow(`
 			insert into items (
 				guid, feed_id, title, link, date,
 				content, media_links,
@@ -61,7 +62,8 @@ func (s *SQLiteStorage) CreateItems(items []model.Item) bool {
 				:filter_id
 			)
 			on conflict (feed_id, guid) do update set
-				last_arrived = :last_arrived`,
+				last_arrived = :last_arrived
+			returning id`,
 			sql.Named("guid", item.GUID),
 			sql.Named("feed_id", item.FeedId),
 			sql.Named("title", item.Title),
@@ -73,7 +75,10 @@ func (s *SQLiteStorage) CreateItems(items []model.Item) bool {
 			sql.Named("last_arrived", now),
 			sql.Named("status", item.Status),
 			sql.Named("filter_id", item.FilterId),
-		)
+		).Scan(&id)
+		if err == nil && item.Page != nil {
+			err = setItemPage(tx, id, model.ItemPage{Content: *item.Page, Blocked: item.PageBlocked})
+		}
 		if err != nil {
 			log.Print(err)
 			if err = tx.Rollback(); err != nil {

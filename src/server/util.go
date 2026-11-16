@@ -1,11 +1,13 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
+	"slices"
+	"time"
 
 	"github.com/nkanaev/yarr/src/client"
 )
@@ -16,7 +18,7 @@ func newCrawlClient() *http.Client {
 		if len(via) >= 10 {
 			return fmt.Errorf("stopped after 10 redirects")
 		}
-		if isInternalFromURL(req.URL.String()) {
+		if IsInternalURL(req.URL.String()) {
 			return fmt.Errorf("redirect to internal address %s", req.URL.Host)
 		}
 		return nil
@@ -24,30 +26,38 @@ func newCrawlClient() *http.Client {
 	return httpClient
 }
 
-func isInternalFromURL(urlStr string) bool {
+// IsInternalURL reports whether a URL points at this machine or the local network,
+// also by a host name resolving to such an address.
+func IsInternalURL(urlStr string) bool {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return false
 	}
 
-	host := parsedURL.Host
-
-	// Handle "host:port" format
-	if strings.Contains(host, ":") {
-		host, _, err = net.SplitHostPort(host)
-		if err != nil {
-			return false
-		}
+	host := parsedURL.Hostname()
+	if host == "" {
+		return false
 	}
-
 	if host == "localhost" {
 		return true
 	}
-
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return false
+	if ip := net.ParseIP(host); ip != nil {
+		return isInternalIP(ip)
 	}
 
+	// a host name may point at an internal address just as well. one that cannot
+	// be resolved cannot be fetched either
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	addrs, err := lookupIPAddr(ctx, host)
+	if err != nil {
+		return false
+	}
+	return slices.ContainsFunc(addrs, func(addr net.IPAddr) bool { return isInternalIP(addr.IP) })
+}
+
+var lookupIPAddr = net.DefaultResolver.LookupIPAddr
+
+func isInternalIP(ip net.IP) bool {
 	return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsUnspecified()
 }

@@ -1,8 +1,13 @@
 package server
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"net"
+	"testing"
+)
 
-func TestIsInternalFromURL(t *testing.T) {
+func TestIsInternalURL(t *testing.T) {
 	tests := []struct {
 		url      string
 		expected bool
@@ -20,13 +25,37 @@ func TestIsInternalFromURL(t *testing.T) {
 		{"http://0.0.0.0:80", true},
 		{"http://8.8.8.8", false},
 		{"http://google.com", false}, // resolves to public IPs
-		{"invalid-url", false},       // invalid format
-		{"", false},                  // empty string
+		{"http://[::1]/", true},
+		{"http://[::1]:7000/", true},
+		{"invalid-url", false}, // invalid format
+		{"", false},            // empty string
 	}
 	for _, test := range tests {
-		result := isInternalFromURL(test.url)
+		result := IsInternalURL(test.url)
 		if result != test.expected {
-			t.Errorf("isInternalFromURL(%q) = %v; want %v", test.url, result, test.expected)
+			t.Errorf("IsInternalURL(%q) = %v; want %v", test.url, result, test.expected)
+		}
+	}
+}
+
+func TestIsInternalURLResolvesHostNames(t *testing.T) {
+	defer func(lookup func(context.Context, string) ([]net.IPAddr, error)) { lookupIPAddr = lookup }(lookupIPAddr)
+	lookupIPAddr = func(_ context.Context, host string) ([]net.IPAddr, error) {
+		switch host {
+		case "internal.example":
+			return []net.IPAddr{{IP: net.ParseIP("93.184.216.34")}, {IP: net.ParseIP("10.0.0.1")}}, nil
+		case "public.example":
+			return []net.IPAddr{{IP: net.ParseIP("93.184.216.34")}}, nil
+		}
+		return nil, errors.New("no such host")
+	}
+	for url, want := range map[string]bool{
+		"http://internal.example/a": true,
+		"http://public.example/a":   false,
+		"http://unknown.example/a":  false,
+	} {
+		if have := IsInternalURL(url); have != want {
+			t.Errorf("IsInternalURL(%q) = %v; want %v", url, have, want)
 		}
 	}
 }

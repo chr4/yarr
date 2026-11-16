@@ -151,6 +151,7 @@ export interface SettingsUpdateData {
 export interface FilterParams {
   pattern: string;
   match_content: boolean;
+  match_page: boolean;
   case_sensitive: boolean;
   feed_id: number | null;
   enabled: boolean;
@@ -159,6 +160,8 @@ export interface FilterParams {
 export interface Filter extends FilterParams {
   id: number;
   hidden: number;
+  // article pages checked by the filter that are behind a captcha
+  blocked: number;
 }
 
 export interface FilterPreviewMatch {
@@ -167,7 +170,7 @@ export interface FilterPreviewMatch {
   title: string;
   date: string;
   status: ItemStatus;
-  field: "title" | "content";
+  field: "title" | "content" | "page";
   before: string;
   match: string;
   after: string;
@@ -177,4 +180,6 @@ export interface FilterPreviewResponse {
   error?: string;
   count: number;
   list: FilterPreviewMatch[];
+  // only for filters checking the article page
+  pages?: { fetching: boolean; left: number; blocked: number };
 }
