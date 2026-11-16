@@ -152,6 +152,8 @@ export interface FilterParams {
   pattern: string;
   match_content: boolean;
   match_page: boolean;
+  // instead of the title
+  match_link: boolean;
   case_sensitive: boolean;
   feed_id: number | null;
   enabled: boolean;
@@ -170,7 +172,7 @@ export interface FilterPreviewMatch {
   title: string;
   date: string;
   status: ItemStatus;
-  field: "title" | "content" | "page";
+  field: "title" | "content" | "page" | "link";
   before: string;
   match: string;
   after: string;

@@ -26,6 +26,7 @@ var migrations = []func(*sql.Tx) error{
 	m16_add_item_filters,
 	m17_add_item_pages,
 	m18_add_item_page_blocked,
+	m19_add_filter_link,
 }
 
 var maxVersion = int64(len(migrations))
@@ -467,5 +468,10 @@ func m17_add_item_pages(tx *sql.Tx) error {
 
 func m18_add_item_page_blocked(tx *sql.Tx) error {
 	_, err := tx.Exec(`alter table item_pages add column blocked boolean not null default false`)
+	return err
+}
+
+func m19_add_filter_link(tx *sql.Tx) error {
+	_, err := tx.Exec(`alter table filters add column match_link boolean not null default false`)
 	return err
 }
